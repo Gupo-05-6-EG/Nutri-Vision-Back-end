@@ -5,7 +5,16 @@ comparar o codigo com o banco, e so enxerga o que foi importado.
 """
 
 from app.db.base import Base
+from app.models.alimento_taco import AlimentoTaco
 from app.models.paciente import Genero, NivelAtividade, Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao
 
-__all__ = ["Base", "Genero", "ItemRefeicao", "NivelAtividade", "Paciente", "Refeicao"]
+__all__ = [
+    "AlimentoTaco",
+    "Base",
+    "Genero",
+    "ItemRefeicao",
+    "NivelAtividade",
+    "Paciente",
+    "Refeicao",
+]

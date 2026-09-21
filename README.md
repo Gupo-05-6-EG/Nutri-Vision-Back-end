@@ -72,6 +72,22 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+## Populando a TACO
+
+Depois das migrations (`alembic upgrade head`), importe a Tabela Brasileira de
+Composição de Alimentos (TACO, 4ª edição, NEPA/UNICAMP) para a tabela `alimento_taco`:
+
+```bash
+python scripts/importar_taco.py            # importa se a tabela estiver vazia
+python scripts/importar_taco.py --recriar   # apaga tudo e reimporta
+```
+
+Os dados ficam em [`data/taco.csv`](data/taco.csv) (590 alimentos, valores por 100g).
+Fonte: planilha oficial da UNICAMP, via [raulfdm/taco-api](https://github.com/raulfdm/taco-api)
+(MIT). Sete itens da tabela original ficaram de fora por terem macro nutriente
+essencial em branco na própria fonte (ex.: leite integral e desnatado sem
+`kcal`/`proteína` preenchidos).
+
 ## Testes e qualidade
 
 ```bash
@@ -137,6 +153,23 @@ divergiria dos itens na primeira edição.
 
 As colunas são opcionais porque o cadastro (Task 1.2) cria o paciente antes da triagem.
 
+### `alimento_taco` — Banco Nutricional TACO (RF02.2)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `nome` | varchar(150) | indexado (usado na busca) |
+| `categoria` | varchar(80) | categoria da TACO (ex.: "Cereais e derivados") |
+| `kcal_100g` | numeric(6,2) | por 100g |
+| `carbs_100g` | numeric(6,2) | por 100g |
+| `prot_100g` | numeric(6,2) | por 100g |
+| `gord_100g` | numeric(6,2) | por 100g |
+
+Populada a partir da Tabela Brasileira de Composição de Alimentos (TACO, 4ª edição,
+NEPA/UNICAMP) — veja [Populando a TACO](#populando-a-taco). O `alimento_id` em
+`itens_refeicao` (ligando um item da refeição a um alimento desta tabela) entra
+numa task futura, quando o front passar a montar refeições a partir da busca.
+
 ## Endpoints
 
 | Método | Rota | Descrição |
@@ -150,6 +183,7 @@ As colunas são opcionais porque o cadastro (Task 1.2) cria o paciente antes da 
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
+| GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | GET | `/docs` | Swagger UI |
 
 > **`paciente_id` por parâmetro é temporário.** Ainda não existe autenticação: a
