@@ -3,8 +3,9 @@ name: CI
 on:
   push:
     branches: [main, develop]
+  # Sem filtro de branch: PRs empilhados (base numa feature branch) tambem
+  # precisam de CI, e com o filtro eles ficavam sem nenhum check.
   pull_request:
-    branches: [main, develop]
   workflow_dispatch:
 
 concurrency:
