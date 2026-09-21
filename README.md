@@ -122,6 +122,21 @@ divergiria dos itens na primeira edição.
 
 Índice `(paciente_id, consumida_em)` sustenta o histórico e o consumo diário.
 
+### `pacientes` — triagem e teto calórico diário inicial
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK, **sem autoincrement**: é o id do usuário (a FK para `usuarios` entra na Task 1.2) |
+| `peso_kg` | numeric(5,2) | opcional; `> 0` |
+| `altura_cm` | numeric(5,2) | opcional; `> 0` |
+| `idade` | int | opcional; `> 0` |
+| `genero` | varchar(30) | `masculino` \| `feminino` |
+| `nivel_atividade` | varchar(30) | `sedentario` \| `leve` \| `moderado` \| `intenso` \| `muito_intenso` |
+| `meta_kcal` | numeric(6,2) | teto calórico diário vigente; `>= 0` |
+| `origem_meta` | varchar(30) | de onde veio a meta (hoje só `harris_benedict`) |
+
+As colunas são opcionais porque o cadastro (Task 1.2) cria o paciente antes da triagem.
+
 ## Endpoints
 
 | Método | Rota | Descrição |
@@ -134,6 +149,7 @@ divergiria dos itens na primeira edição.
 | GET | `/api/v1/refeicoes/{id}` | Detalhe de uma refeição |
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
+| POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
 | GET | `/docs` | Swagger UI |
 
 > **`paciente_id` por parâmetro é temporário.** Ainda não existe autenticação: a
@@ -156,6 +172,57 @@ curl -X POST http://localhost:8000/api/v1/refeicoes   -H 'Content-Type: applicat
 
 curl 'http://localhost:8000/api/v1/refeicoes/consumo-diario?paciente_id=1&data=2026-09-20'
 ```
+
+### Cálculo basal (RF14)
+
+`POST /api/v1/pacientes/{paciente_id}/triagem` recebe os dados da triagem, calcula o
+**Teto Calórico Diário Inicial** e o salva em `pacientes.meta_kcal`
+(`origem_meta = "harris_benedict"`). Se o paciente ainda não existe ele é criado; se já
+existe, a triagem e o teto são sobrescritos (refazer a triagem gera um novo teto).
+
+**Corpo da requisição** — todos os campos são obrigatórios:
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `peso_kg` | número | 20 a 250, até 2 casas decimais |
+| `altura_cm` | número | 100 a 250, até 2 casas decimais (**centímetros**, não metros) |
+| `idade` | inteiro | 10 a 120 |
+| `genero` | texto | `masculino` \| `feminino` |
+| `nivel_atividade` | texto | `sedentario` \| `leve` \| `moderado` \| `intenso` \| `muito_intenso` |
+
+**Como o teto é calculado**
+
+1. **TMB** pela equação de Harris-Benedict original (1919), em kcal/dia:
+   - homem: `66,47 + 13,75 × peso + 5,003 × altura − 6,755 × idade`
+   - mulher: `655,1 + 9,563 × peso + 1,850 × altura − 4,676 × idade`
+2. **Teto calórico** = TMB × fator do nível de atividade:
+
+| `nivel_atividade` | Fator |
+|---|---|
+| `sedentario` | 1,2 |
+| `leve` | 1,375 |
+| `moderado` | 1,55 |
+| `intenso` | 1,725 |
+| `muito_intenso` | 1,9 |
+
+Os resultados são arredondados para 2 casas (meio para cima). Os valores devolvidos
+batem entre si: `tmb_kcal × fator_atividade = teto_calorico_kcal`.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/pacientes/1/triagem   -H 'Content-Type: application/json'   -d '{"peso_kg": 80, "altura_cm": 180, "idade": 30, "genero": "masculino", "nivel_atividade": "moderado"}'
+```
+
+```json
+{
+  "paciente_id": 1,
+  "tmb_kcal": 1864.36,
+  "fator_atividade": 1.55,
+  "teto_calorico_kcal": 2889.76,
+  "origem_meta": "harris_benedict"
+}
+```
+
+Dados inválidos devolvem `422`.
 
 ### Valores nutricionais
 
