@@ -1,0 +1,5 @@
+Migrations do banco (Alembic).
+
+  alembic revision --autogenerate -m "descricao"   # cria migration a partir dos modelos
+  alembic upgrade head                             # aplica
+  alembic downgrade -1                             # desfaz a ultima

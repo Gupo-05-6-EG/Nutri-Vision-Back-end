@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# Virtualenvs
+.venv/
+venv/
+env/
+
+# Ambiente
+.env
+.env.*
+!.env.example
+
+# Testes / cobertura
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.ruff_cache/
+.mypy_cache/
+
+# Banco local
+*.sqlite3
+*.db
+
+# Editores / SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
