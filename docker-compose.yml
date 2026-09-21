@@ -7,6 +7,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-nutrivision}
       POSTGRES_DB: ${POSTGRES_DB:-nutrivision}
     ports:
+      # Se a 5432 ja estiver ocupada por um Postgres instalado na maquina,
+      # defina POSTGRES_PORT=5433 no .env.
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -30,7 +32,11 @@ services:
     volumes:
       - ./app:/app/app
       - ./alembic:/app/alembic
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # Aplica as migrations antes de servir: sem isso o banco sobe vazio e todo
+    # endpoint responde 500 sem motivo aparente.
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
 volumes:
   postgres_data:
