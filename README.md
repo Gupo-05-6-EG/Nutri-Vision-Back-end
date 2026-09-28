@@ -116,6 +116,7 @@ pull request para `main`/`develop`, com quatro jobs:
 | `id` | int | PK |
 | `paciente_id` | int | indexado; a FK para `usuarios` entra na Task 1.2 |
 | `consumida_em` | timestamptz | quando a refeição foi consumida (gravado em UTC) |
+| `tipo` | varchar(20) | `cafe_da_manha` \| `almoco` \| `lanche` \| `jantar` (RF19) |
 | `observacao` | varchar(500) | opcional |
 | `criada_em` / `atualizada_em` | timestamptz | auditoria |
 
@@ -137,6 +138,13 @@ somados a partir dos itens na hora da leitura — uma soma gravada no banco
 divergiria dos itens na primeira edição.
 
 Índice `(paciente_id, consumida_em)` sustenta o histórico e o consumo diário.
+Índice `(paciente_id, tipo)` sustenta o filtro por tipo (RF19).
+
+**Categorização automática (RF19).** Se `tipo` não vier no `POST`, o service
+sugere um valor a partir da hora de `consumida_em`: `cafe_da_manha` (05h–11h),
+`almoco` (11h–15h), `jantar` (18h–22h); qualquer outro horário cai em `lanche`,
+que funciona como categoria coringa. O cliente pode sempre informar `tipo`
+explicitamente para sobrepor a sugestão.
 
 ### `pacientes` — triagem e teto calórico diário inicial
 
@@ -176,9 +184,9 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 |---|---|---|
 | GET | `/api/v1/health` | Liveness |
 | GET | `/api/v1/health/db` | Readiness (consulta o banco) |
-| POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04) |
-| GET | `/api/v1/refeicoes?paciente_id=&data=` | Histórico, opcionalmente de um dia (RF12) |
-| GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=` | Consumo do dia com os totais (RF12) |
+| POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
+| GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
+| GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/{id}` | Detalhe de uma refeição |
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |

@@ -1,4 +1,4 @@
-"""Regras de negocio das refeicoes (RF04, RF12)."""
+"""Regras de negocio das refeicoes (RF04, RF12, RF19)."""
 
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
@@ -6,8 +6,18 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models.refeicao import CAMPOS_NUTRICIONAIS, ItemRefeicao, Refeicao, somar
+from app.models.refeicao import CAMPOS_NUTRICIONAIS, ItemRefeicao, Refeicao, TipoRefeicao, somar
 from app.schemas.refeicao import RefeicaoCreate, RefeicaoUpdate
+
+# Janelas de horario (hora local tratada como UTC, igual ao resto da app -
+# ver `_em_utc`) usadas para sugerir o tipo quando o cliente nao informa um.
+# Fora das janelas de cafe/almoco/jantar cai em lanche, que funciona como
+# categoria coringa (ex.: uma refeicao registrada de madrugada).
+_JANELAS_SUGESTAO: tuple[tuple[int, int, TipoRefeicao], ...] = (
+    (5, 11, TipoRefeicao.CAFE_DA_MANHA),
+    (11, 15, TipoRefeicao.ALMOCO),
+    (18, 22, TipoRefeicao.JANTAR),
+)
 
 
 class RefeicaoNaoEncontrada(Exception):
@@ -33,6 +43,15 @@ def _validar_consumida_em(momento: datetime) -> datetime:
     return normalizado
 
 
+def sugerir_tipo(consumida_em: datetime) -> TipoRefeicao:
+    """Sugere o tipo da refeicao a partir da hora de `consumida_em` (RF19)."""
+    hora = _em_utc(consumida_em).hour
+    for inicio, fim, tipo in _JANELAS_SUGESTAO:
+        if inicio <= hora < fim:
+            return tipo
+    return TipoRefeicao.LANCHE
+
+
 def _intervalo_do_dia(dia: date) -> tuple[datetime, datetime]:
     """Limites [inicio, fim) do dia em UTC."""
     inicio = datetime.combine(dia, time.min, tzinfo=UTC)
@@ -40,9 +59,11 @@ def _intervalo_do_dia(dia: date) -> tuple[datetime, datetime]:
 
 
 def criar_refeicao(db: Session, dados: RefeicaoCreate) -> Refeicao:
+    consumida_em = _validar_consumida_em(dados.consumida_em)
     refeicao = Refeicao(
         paciente_id=dados.paciente_id,
-        consumida_em=_validar_consumida_em(dados.consumida_em),
+        consumida_em=consumida_em,
+        tipo=dados.tipo or sugerir_tipo(consumida_em),
         observacao=dados.observacao,
         itens=[ItemRefeicao(**item.model_dump()) for item in dados.itens],
     )
@@ -64,6 +85,8 @@ def atualizar_refeicao(db: Session, refeicao_id: int, dados: RefeicaoUpdate) -> 
 
     if dados.consumida_em is not None:
         refeicao.consumida_em = _validar_consumida_em(dados.consumida_em)
+    if dados.tipo is not None:
+        refeicao.tipo = dados.tipo
     if dados.observacao is not None:
         refeicao.observacao = dados.observacao
     if dados.itens is not None:
@@ -84,18 +107,23 @@ def listar_refeicoes(
     db: Session,
     paciente_id: int,
     dia: date | None = None,
+    tipo: TipoRefeicao | None = None,
     limite: int = 50,
     deslocamento: int = 0,
 ) -> list[Refeicao]:
     """Refeicoes de um paciente, das mais recentes para as mais antigas.
 
-    Com `dia`, restringe ao intervalo daquele dia em UTC.
+    Com `dia`, restringe ao intervalo daquele dia em UTC. Com `tipo`, restringe
+    a uma categoria (cafe da manha, almoco, lanche ou jantar - RF19).
     """
     consulta = select(Refeicao).where(Refeicao.paciente_id == paciente_id)
 
     if dia is not None:
         inicio, fim = _intervalo_do_dia(dia)
         consulta = consulta.where(Refeicao.consumida_em >= inicio, Refeicao.consumida_em < fim)
+
+    if tipo is not None:
+        consulta = consulta.where(Refeicao.tipo == tipo)
 
     consulta = (
         consulta.order_by(Refeicao.consumida_em.desc(), Refeicao.id.desc())
@@ -105,9 +133,14 @@ def listar_refeicoes(
     return list(db.execute(consulta).scalars())
 
 
-def consumo_diario(db: Session, paciente_id: int, dia: date) -> dict[str, object]:
-    """Consumo do dia com os totais de calorias e macros (RF12)."""
-    refeicoes = listar_refeicoes(db, paciente_id, dia=dia, limite=200)
+def consumo_diario(
+    db: Session, paciente_id: int, dia: date, tipo: TipoRefeicao | None = None
+) -> dict[str, object]:
+    """Consumo do dia com os totais de calorias e macros (RF12).
+
+    Com `tipo`, restringe o consumo a uma categoria de refeicao (RF19).
+    """
+    refeicoes = listar_refeicoes(db, paciente_id, dia=dia, tipo=tipo, limite=200)
     itens = [item for refeicao in refeicoes for item in refeicao.itens]
 
     totais: dict[str, Decimal] = {campo: somar(itens, campo) for campo in CAMPOS_NUTRICIONAIS}
