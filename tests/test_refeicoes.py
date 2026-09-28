@@ -1,11 +1,19 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from tests import factories
 
 ROTA = "/api/v1/refeicoes"
+
+
+@pytest.fixture(autouse=True)
+def _pacientes(db: Session) -> None:
+    factories.criar_paciente(db, 1)
+    factories.criar_paciente(db, 2)
 
 
 def _criar(client: TestClient, **kwargs: Any) -> dict[str, Any]:
@@ -15,6 +23,12 @@ def _criar(client: TestClient, **kwargs: Any) -> dict[str, Any]:
 
 
 class TestRegistro:
+    def test_recusa_paciente_nao_cadastrado(self, client: TestClient) -> None:
+        resposta = client.post(ROTA, json=factories.refeicao(paciente_id=999))
+
+        assert resposta.status_code == 422
+        assert "paciente" in resposta.json()["detail"]
+
     def test_registra_refeicao_com_itens(self, client: TestClient) -> None:
         corpo = _criar(client, observacao="Almoco em casa")
 

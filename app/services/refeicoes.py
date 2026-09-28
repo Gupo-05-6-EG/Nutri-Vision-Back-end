@@ -6,12 +6,17 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.models.paciente import Paciente
 from app.models.refeicao import CAMPOS_NUTRICIONAIS, ItemRefeicao, Refeicao, somar
 from app.schemas.refeicao import RefeicaoCreate, RefeicaoUpdate
 
 
 class RefeicaoNaoEncontrada(Exception):
     """Nao existe refeicao com o id informado."""
+
+
+class PacienteNaoEncontrado(Exception):
+    """`paciente_id` nao corresponde a um paciente cadastrado."""
 
 
 class DataDeConsumoNoFuturo(Exception):
@@ -40,6 +45,8 @@ def _intervalo_do_dia(dia: date) -> tuple[datetime, datetime]:
 
 
 def criar_refeicao(db: Session, dados: RefeicaoCreate) -> Refeicao:
+    if db.get(Paciente, dados.paciente_id) is None:
+        raise PacienteNaoEncontrado
     refeicao = Refeicao(
         paciente_id=dados.paciente_id,
         consumida_em=_validar_consumida_em(dados.consumida_em),
