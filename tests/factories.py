@@ -25,13 +25,17 @@ def item(
 def refeicao(
     paciente_id: int = 1,
     consumida_em: datetime | None = None,
+    tipo: str | None = None,
     itens: list[dict[str, Any]] | None = None,
     observacao: str | None = None,
 ) -> dict[str, Any]:
     momento = consumida_em or datetime.now(UTC) - timedelta(hours=1)
-    return {
+    payload = {
         "paciente_id": paciente_id,
         "consumida_em": momento.isoformat(),
         "observacao": observacao,
         "itens": itens if itens is not None else [item()],
     }
+    if tipo is not None:
+        payload["tipo"] = tipo
+    return payload

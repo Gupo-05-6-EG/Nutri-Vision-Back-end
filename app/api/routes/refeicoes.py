@@ -11,6 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, status
 
 from app.db.deps import DbSession
+from app.models.refeicao import TipoRefeicao
 from app.schemas.refeicao import ConsumoDiario, RefeicaoCreate, RefeicaoOut, RefeicaoUpdate
 from app.services import refeicoes as servico
 
@@ -19,6 +20,10 @@ router = APIRouter(prefix="/refeicoes", tags=["refeicoes"])
 PacienteId = Annotated[int, Query(gt=0, description="Id do paciente")]
 Dia = Annotated[date, Query(description="Dia do consumo (YYYY-MM-DD, em UTC)")]
 DiaOpcional = Annotated[date | None, Query(description="Filtra por um dia (YYYY-MM-DD, em UTC)")]
+TipoOpcional = Annotated[
+    TipoRefeicao | None,
+    Query(description="Filtra por tipo: cafe_da_manha, almoco, lanche ou jantar"),
+]
 
 
 @router.post(
@@ -43,11 +48,12 @@ def listar_refeicoes(
     db: DbSession,
     paciente_id: PacienteId,
     data: DiaOpcional = None,
+    tipo: TipoOpcional = None,
     limite: Annotated[int, Query(ge=1, le=200)] = 50,
     deslocamento: Annotated[int, Query(ge=0)] = 0,
 ) -> list[RefeicaoOut]:
     refeicoes = servico.listar_refeicoes(
-        db, paciente_id, dia=data, limite=limite, deslocamento=deslocamento
+        db, paciente_id, dia=data, tipo=tipo, limite=limite, deslocamento=deslocamento
     )
     return [RefeicaoOut.model_validate(refeicao) for refeicao in refeicoes]
 
@@ -57,8 +63,10 @@ def listar_refeicoes(
     response_model=ConsumoDiario,
     summary="Consumo de um dia com os totais de calorias e macros",
 )
-def consumo_diario(db: DbSession, paciente_id: PacienteId, data: Dia) -> ConsumoDiario:
-    return ConsumoDiario.model_validate(servico.consumo_diario(db, paciente_id, data))
+def consumo_diario(
+    db: DbSession, paciente_id: PacienteId, data: Dia, tipo: TipoOpcional = None
+) -> ConsumoDiario:
+    return ConsumoDiario.model_validate(servico.consumo_diario(db, paciente_id, data, tipo=tipo))
 
 
 @router.get("/{refeicao_id}", response_model=RefeicaoOut, summary="Detalhe de uma refeicao")
