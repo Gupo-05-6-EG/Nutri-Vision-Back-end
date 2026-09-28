@@ -1,8 +1,8 @@
 """Endpoints de registro e historico de refeicoes (RF04, RF12).
 
-`paciente_id` chega por parametro enquanto nao existe autenticacao. A Task 1.2
-passa a tirar o paciente do token JWT e a Task 1.6 aplica o controle de acesso
-por perfil e vinculo.
+`paciente_id` ainda chega por parametro: a Task 1.6 (RNF06) passa a exigir o
+token (`app.api.deps.UsuarioAtual`) e a validar se quem chama e o proprio
+paciente ou um nutricionista vinculado.
 """
 
 from datetime import date
@@ -30,6 +30,11 @@ DiaOpcional = Annotated[date | None, Query(description="Filtra por um dia (YYYY-
 def registrar_refeicao(dados: RefeicaoCreate, db: DbSession) -> RefeicaoOut:
     try:
         refeicao = servico.criar_refeicao(db, dados)
+    except servico.PacienteNaoEncontrado:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="paciente_id nao corresponde a um paciente cadastrado",
+        ) from None
     except servico.DataDeConsumoNoFuturo:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

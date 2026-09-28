@@ -6,7 +6,6 @@ outras tasks entram por migration depois:
 - `tipo` (cafe da manha, almoco, jantar, lanche) -> Task 2.4 (RF19)
 - estimativa da IA vs valor confirmado no item -> Task 2.7 (RF23)
 - `alimento_id` apontando para a tabela TACO -> Task 2.2 (RF02.2)
-- FK de `paciente_id` para a tabela de usuarios -> Task 1.2 (RF13)
 """
 
 from datetime import datetime
@@ -42,9 +41,9 @@ class Refeicao(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    # Sem FK ainda: a tabela de usuarios nasce na Task 1.2, que adiciona a
-    # constraint por migration.
-    paciente_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    paciente_id: Mapped[int] = mapped_column(
+        ForeignKey("pacientes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     consumida_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
