@@ -184,6 +184,8 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 |---|---|---|
 | GET | `/api/v1/health` | Liveness |
 | GET | `/api/v1/health/db` | Readiness (consulta o banco) |
+| POST | `/api/v1/linking-code` | Gera um codigo de vinculacao de 6 digitos para o nutricionista autenticado |
+| POST | `/api/v1/link` | Resgata um codigo de vinculacao e cria o vinculo paciente-nutricionista |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
 | GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
@@ -193,6 +195,10 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | GET | `/docs` | Swagger UI |
+
+> Os endpoints de vinculação usam o JWT do `Authorization: Bearer ...` para
+> identificar o perfil e o autor do código. O código é numérico, tem 6 dígitos
+> e expira após o período definido em `LINKING_CODE_EXPIRE_MINUTES`.
 
 > **`paciente_id` por parâmetro é temporário.** Ainda não existe autenticação: a
 > Task 1.2 passa a tirar o paciente do token JWT e a Task 1.6 aplica o controle
