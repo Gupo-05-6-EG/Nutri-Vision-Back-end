@@ -18,9 +18,7 @@ router = APIRouter(tags=["vinculos"])
 NutricionistaAutenticado = Annotated[
     UsuarioAutenticado, Depends(require_perfil(Perfil.NUTRICIONISTA))
 ]
-PacienteAutenticado = Annotated[
-    UsuarioAutenticado, Depends(require_perfil(Perfil.PACIENTE))
-]
+PacienteAutenticado = Annotated[UsuarioAutenticado, Depends(require_perfil(Perfil.PACIENTE))]
 
 
 @router.post(
