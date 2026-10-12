@@ -23,9 +23,10 @@ class Settings(BaseSettings):
     TEST_DATABASE_URL: str = "sqlite+pysqlite:///:memory:"
 
     # Seguranca (usado a partir da Task 1.2)
-    SECRET_KEY: str = "troque-esta-chave-em-producao"
+    SECRET_KEY: str = "troque-esta-chave-em-producao-com-mais-de-32-bytes"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    LINKING_CODE_EXPIRE_MINUTES: int = 60 * 24
 
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [

@@ -184,6 +184,8 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 |---|---|---|
 | GET | `/api/v1/health` | Liveness |
 | GET | `/api/v1/health/db` | Readiness (consulta o banco) |
+| POST | `/api/v1/linking-code` | Gera um codigo de vinculacao de 6 digitos para o nutricionista autenticado |
+| POST | `/api/v1/link` | Resgata um codigo de vinculacao e cria o vinculo paciente-nutricionista |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
 | GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
@@ -193,6 +195,10 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | GET | `/docs` | Swagger UI |
+
+> Os endpoints de vinculação usam o JWT do `Authorization: Bearer ...` para
+> identificar o perfil e o autor do código. O código é numérico, tem 6 dígitos
+> e expira após o período definido em `LINKING_CODE_EXPIRE_MINUTES`.
 
 > **`paciente_id` por parâmetro é temporário.** Ainda não existe autenticação: a
 > Task 1.2 passa a tirar o paciente do token JWT e a Task 1.6 aplica o controle
@@ -265,6 +271,24 @@ curl -X POST http://localhost:8000/api/v1/pacientes/1/triagem   -H 'Content-Type
 ```
 
 Dados inválidos devolvem `422`.
+
+### Mecanismo de vinculação (RF15)
+
+Permite o vínculo entre paciente e nutricionista por meio de um código temporário de 6 dígitos:
+
+- `POST /api/v1/linking-code`: Exige autenticação de nutricionista (`Authorization: Bearer <token>`). Gera um código numérico de 6 dígitos que expira conforme `LINKING_CODE_EXPIRE_MINUTES`.
+- `POST /api/v1/link`: Exige autenticação de paciente. Recebe `{"codigo": "123456"}` e cria o vínculo de forma atômica e idempotente.
+
+**Comportamento de erro e respostas HTTP:**
+- `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, perfil/sub ausente ou inválido, ou usuário inexistente.
+- `403 Forbidden`: perfil incompatível (paciente tentando gerar código, nutricionista tentando resgatar, ou paciente tentando resgatar código gerado por ele mesmo).
+- `404 Not Found`: código não encontrado.
+- `409 Conflict`: código já utilizado por outro paciente.
+- `410 Gone`: código expirado.
+- `422 Unprocessable Entity`: formato inválido (ex.: código não numérico ou com tamanho diferente de 6 dígitos).
+
+**Migrations e Integridade Referencial:**
+A migration `a1b2c3d4e5f6` unifica os branches concorrentes do Alembic e adiciona integridade referencial com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
 
 ### Valores nutricionais
 
