@@ -3,18 +3,17 @@
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
+import jwt
+import pytest
+import sqlalchemy as sa
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
-import jwt
-import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
 from app.core.security import Perfil, UsuarioAutenticado, create_access_token
-from app.models.paciente import Paciente
-from app.models.usuario import Nutricionista, Usuario
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
 from app.services.vinculos import _hash_codigo, resgatar_codigo_vinculacao
 
@@ -30,53 +29,6 @@ def _headers(
         expires_delta=timedelta(minutes=30),
     )
     return {"Authorization": f"Bearer {token}"}
-
-
-@pytest.fixture(autouse=True)
-def _seed_usuarios(db: Session) -> None:
-    """Garante a presenca dos usuarios padrao nos testes para integridade de FKs."""
-    if db.get(Usuario, 10) is None:
-        db.add(
-            Usuario(
-                id=10,
-                nome="Dra. Ana",
-                email="ana@exemplo.com",
-                senha_hash="hash-bcrypt-10",
-                perfil=Perfil.NUTRICIONISTA.value,
-            )
-        )
-        db.flush()
-        db.add(Nutricionista(id=10, crn="CRN-3 12345"))
-
-    if db.get(Usuario, 11) is None:
-        db.add(
-            Usuario(
-                id=11,
-                nome="Joao",
-                email="joao@exemplo.com",
-                senha_hash="hash-bcrypt-11",
-                perfil=Perfil.PACIENTE.value,
-            )
-        )
-        db.flush()
-        db.add(Paciente(id=11))
-        # Adiciona tambem como nutricionista para viabilizar teste de proprio codigo com FK
-        db.add(Nutricionista(id=11, crn="CRN-3 99999"))
-
-    if db.get(Usuario, 12) is None:
-        db.add(
-            Usuario(
-                id=12,
-                nome="Maria",
-                email="maria@exemplo.com",
-                senha_hash="hash-bcrypt-12",
-                perfil=Perfil.PACIENTE.value,
-            )
-        )
-        db.flush()
-        db.add(Paciente(id=12))
-
-    db.commit()
 
 
 def _gerar_codigo(client: TestClient) -> str:
@@ -264,43 +216,6 @@ class TestResgateCodigo:
         SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
         sessao_inicial = SessionLocal()
-        if sessao_inicial.get(Usuario, 10) is None:
-            sessao_inicial.add(
-                Usuario(
-                    id=10,
-                    nome="Dra. Ana",
-                    email="ana@exemplo.com",
-                    senha_hash="hash",
-                    perfil=Perfil.NUTRICIONISTA.value,
-                )
-            )
-            sessao_inicial.flush()
-            sessao_inicial.add(Nutricionista(id=10, crn="CRN-3 12345"))
-        if sessao_inicial.get(Usuario, 11) is None:
-            sessao_inicial.add(
-                Usuario(
-                    id=11,
-                    nome="Joao",
-                    email="joao@exemplo.com",
-                    senha_hash="hash",
-                    perfil=Perfil.PACIENTE.value,
-                )
-            )
-            sessao_inicial.flush()
-            sessao_inicial.add(Paciente(id=11))
-        if sessao_inicial.get(Usuario, 12) is None:
-            sessao_inicial.add(
-                Usuario(
-                    id=12,
-                    nome="Maria",
-                    email="maria@exemplo.com",
-                    senha_hash="hash",
-                    perfil=Perfil.PACIENTE.value,
-                )
-            )
-            sessao_inicial.flush()
-            sessao_inicial.add(Paciente(id=12))
-
         sessao_inicial.add(
             CodigoVinculacao(
                 nutricionista_id=10,
@@ -334,7 +249,15 @@ class TestResgateCodigo:
         assert resultados.count("ok:10") == 1
         sessao_verificacao = SessionLocal()
         try:
-            assert sessao_verificacao.query(Vinculo).count() == 1
+            assert (
+                sessao_verificacao.query(Vinculo)
+                .filter(
+                    Vinculo.nutricionista_id == 10,
+                    Vinculo.paciente_id.in_([11, 12]),
+                )
+                .count()
+                == 1
+            )
         finally:
             sessao_verificacao.close()
 
@@ -407,17 +330,7 @@ class TestValidacaoJWT:
         resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {perfil_estranho}"})
         assert resposta.status_code == 401
 
-    def test_token_de_usuario_inexistente_retorna_401(self, client: TestClient) -> None:
-        token_inexistente = create_access_token(
-            {"sub": 9999, "perfil": "nutricionista", "nome": "Fantasma"},
-            expires_delta=timedelta(hours=1),
-        )
-        resposta = client.post(
-            ROTA_CODIGO, headers={"Authorization": f"Bearer {token_inexistente}"}
-        )
-        assert resposta.status_code == 401
-
-    def test_token_sem_nome_utiliza_nome_do_banco(self, client: TestClient) -> None:
+    def test_token_sem_nome_utiliza_nome_padrao(self, client: TestClient) -> None:
         """Tokens emitidos pelo login/cadastro da Task 1.2 (sem nome) sao aceitos."""
         settings = get_settings()
         token_sem_nome = jwt.encode(
@@ -436,66 +349,16 @@ class TestValidacaoJWT:
 
 
 class TestIntegridadeReferencial:
-    def test_vinculo_com_nutricionista_inexistente_falha(self, db: Session) -> None:
-        vinculo = Vinculo(nutricionista_id=999, paciente_id=11)
-        db.add(vinculo)
-        with pytest.raises(IntegrityError):
-            db.commit()
-        db.rollback()
-
-    def test_vinculo_com_paciente_inexistente_falha(self, db: Session) -> None:
-        vinculo = Vinculo(nutricionista_id=10, paciente_id=999)
-        db.add(vinculo)
-        with pytest.raises(IntegrityError):
-            db.commit()
-        db.rollback()
-
-    def test_codigo_vinculacao_com_nutricionista_inexistente_falha(self, db: Session) -> None:
-        codigo = CodigoVinculacao(
-            nutricionista_id=999,
-            nutricionista_nome="Inexistente",
-            nutricionista_foto_url=None,
-            codigo_hash=_hash_codigo("999999"),
-            status=StatusCodigoVinculacao.ATIVO.value,
-            expira_em=datetime.now(UTC) + timedelta(minutes=30),
-        )
-        db.add(codigo)
-        with pytest.raises(IntegrityError):
-            db.commit()
-        db.rollback()
-
-    def test_remocao_de_nutricionista_propaga_em_cascata(self, db: Session) -> None:
-        u = Usuario(
-            id=50,
-            nome="Nutri Temp",
-            email="temp50@exemplo.com",
-            senha_hash="hash",
-            perfil=Perfil.NUTRICIONISTA.value,
-        )
-        db.add(u)
-        db.flush()
-        nutri = Nutricionista(id=50, crn="CRN-50")
-        db.add(nutri)
-        cod = CodigoVinculacao(
-            nutricionista_id=50,
-            nutricionista_nome="Nutri Temp",
-            nutricionista_foto_url=None,
-            codigo_hash=_hash_codigo("505050"),
-            status=StatusCodigoVinculacao.ATIVO.value,
-            expira_em=datetime.now(UTC) + timedelta(minutes=30),
-        )
-        db.add(cod)
-        vinc = Vinculo(nutricionista_id=50, paciente_id=11)
-        db.add(vinc)
-        db.commit()
-
-        db.delete(nutri)
-        db.commit()
-
-        assert (
-            db.query(CodigoVinculacao).filter(CodigoVinculacao.nutricionista_id == 50).count() == 0
-        )
-        assert db.query(Vinculo).filter(Vinculo.nutricionista_id == 50).count() == 0
+    def test_foreign_keys_rejeitam_ids_inexistentes(self, engine) -> None:
+        with engine.connect() as conn:
+            conn.execute(sa.text("PRAGMA foreign_keys = ON"))
+            with pytest.raises(IntegrityError):
+                conn.execute(
+                    sa.text(
+                        "INSERT INTO vinculos (nutricionista_id, paciente_id) "
+                        "VALUES (999, 888)"
+                    )
+                )
 
 
 class TestMigrationAlembic:

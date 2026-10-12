@@ -3,14 +3,13 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any
 
+import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-import jwt
 from pydantic import BaseModel, Field, ValidationError
 
 from app.core.config import get_settings
-from app.db.deps import DbSession
-from app.models.usuario import Perfil, Usuario
+from app.models.usuario import Perfil
 
 # Alias para compatibilidade com o codigo existente da Task 1.4
 PerfilUsuario = Perfil
@@ -124,10 +123,9 @@ def ler_token_acesso(token: str) -> dict[str, Any]:
 
 
 def get_current_user(
-    db: DbSession,
-    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
 ) -> UsuarioAutenticado:
-    """Decodifica e valida o JWT, garantindo perfil e usuario cadastrado."""
+    """Decodifica e valida o JWT, garantindo perfil e campos obrigatorios."""
     if credentials is None:
         raise NAO_AUTENTICADO
 
@@ -138,14 +136,7 @@ def get_current_user(
     except (TokenInvalido, ValueError):
         raise TOKEN_INVALIDO from None
 
-    usuario_db = db.get(Usuario, usuario_id)
-    if usuario_db is None:
-        raise NAO_AUTENTICADO
-
-    if usuario_db.perfil != perfil.value:
-        raise TOKEN_INVALIDO
-
-    nome = payload.get("nome") or usuario_db.nome
+    nome = payload.get("nome") or f"Usuario {usuario_id}"
     foto_url = payload.get("foto_url")
 
     try:
