@@ -42,7 +42,7 @@ def gerar_codigo(
 
     return CodigoVinculacaoCreateOut.model_validate(
         {
-            "codigo": getattr(registro, "codigo_em_texto"),
+            "codigo": registro.codigo_em_texto,
             "status": registro.status,
             "expira_em": registro.expira_em,
         }

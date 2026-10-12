@@ -117,11 +117,14 @@ def gerar_codigo_vinculacao(db: Session, usuario: UsuarioAutenticado) -> CodigoV
 
 def _buscar_codigo_ativo(db: Session, codigo: str) -> CodigoVinculacao | None:
     codigo_hash = _hash_codigo(codigo)
-    return db.execute(
-        select(CodigoVinculacao)
-        .where(CodigoVinculacao.codigo_hash == codigo_hash)
-        .with_for_update()
-    ).scalar_one_or_none()
+    stmt = select(CodigoVinculacao).where(CodigoVinculacao.codigo_hash == codigo_hash)
+    try:
+        bind = db.get_bind()
+        if bind.dialect.name == "postgresql":
+            stmt = stmt.with_for_update()
+    except Exception:
+        pass
+    return db.execute(stmt).scalar_one_or_none()
 
 
 def resgatar_codigo_vinculacao(
@@ -165,6 +168,10 @@ def resgatar_codigo_vinculacao(
         db.rollback()
         raise CodigoVinculacaoJaUtilizado
 
+    registro.status = StatusCodigoVinculacao.RESGATADO.value
+    registro.paciente_id = usuario.id
+    registro.resgatado_em = agora
+
     vinculo_existente = db.execute(
         select(Vinculo).where(
             Vinculo.nutricionista_id == registro.nutricionista_id,
@@ -200,12 +207,11 @@ def resgatar_codigo_vinculacao(
         db.rollback()
         raise VinculoDuplicado from exc
 
-    db.refresh(registro)
-    db.refresh(vinculo)
+    vinculado_em = _em_utc(vinculo.criado_em or agora)
 
     return VinculoResgatado(
         nutricionista_id=registro.nutricionista_id,
         nutricionista_nome=registro.nutricionista_nome,
         nutricionista_foto_url=registro.nutricionista_foto_url,
-        vinculado_em=_em_utc(vinculo.criado_em),
+        vinculado_em=vinculado_em,
     )

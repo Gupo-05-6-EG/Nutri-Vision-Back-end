@@ -123,7 +123,7 @@ def ler_token_acesso(token: str) -> dict[str, Any]:
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_scheme)],
 ) -> UsuarioAutenticado:
     """Decodifica e valida o JWT, garantindo perfil e campos obrigatorios."""
     if credentials is None:
