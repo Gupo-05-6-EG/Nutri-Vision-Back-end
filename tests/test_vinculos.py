@@ -6,12 +6,12 @@ from datetime import UTC, datetime, timedelta
 import jwt
 import pytest
 import sqlalchemy as sa
-from alembic.config import Config
-from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from app.core.config import get_settings
 from app.core.security import Perfil, UsuarioAutenticado, create_access_token
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
@@ -342,9 +342,7 @@ class TestValidacaoJWT:
             settings.SECRET_KEY,
             algorithm=settings.ALGORITHM,
         )
-        resposta = client.post(
-            ROTA_CODIGO, headers={"Authorization": f"Bearer {token_sem_nome}"}
-        )
+        resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {token_sem_nome}"})
         assert resposta.status_code == 200
 
 
@@ -355,8 +353,7 @@ class TestIntegridadeReferencial:
             with pytest.raises(IntegrityError):
                 conn.execute(
                     sa.text(
-                        "INSERT INTO vinculos (nutricionista_id, paciente_id) "
-                        "VALUES (999, 888)"
+                        "INSERT INTO vinculos (nutricionista_id, paciente_id) " "VALUES (999, 888)"
                     )
                 )
 
@@ -367,4 +364,4 @@ class TestMigrationAlembic:
         script = ScriptDirectory.from_config(config)
         heads = script.get_heads()
         assert len(heads) == 1, f"Esperava head unica, mas foram encontradas: {heads}"
-        assert heads[0] == "a1b2c3d4e5f6"
+        assert heads[0] == "b7c8d9e0f123"

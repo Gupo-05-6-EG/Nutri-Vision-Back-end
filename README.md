@@ -158,8 +158,31 @@ explicitamente para sobrepor a sugestão.
 | `nivel_atividade` | varchar(30) | `sedentario` \| `leve` \| `moderado` \| `intenso` \| `muito_intenso` |
 | `meta_kcal` | numeric(6,2) | teto calórico diário vigente; `>= 0` |
 | `origem_meta` | varchar(30) | de onde veio a meta (hoje só `harris_benedict`) |
+| `streak` | int | dias consecutivos que cumpriram a regra diária (inicia em `0`) |
+| `xp` | int | pontos acumulados; cada dia válido soma `50` |
+| `gamificacao_processada_em` | date | último dia fechado, impede crédito duplicado |
 
 As colunas são opcionais porque o cadastro (Task 1.2) cria o paciente antes da triagem.
+
+`streak` e `xp` guardam, respectivamente, os dias consecutivos que cumpriram a
+regra de gamificação e os pontos acumulados. O fechamento diário considera as
+refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo de
+até 30% de `meta_kcal`, soma 1 ao streak e 50 XP; caso contrário, zera o streak.
+O fechamento não altera XP quando a regra não é cumprida. Pacientes sem meta
+calórica também não cumprem a regra.
+
+O job pode ser agendado pelo cron do ambiente para 23:59 (horário de São Paulo):
+
+```cron
+CRON_TZ=America/Sao_Paulo
+59 23 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_gamificacao
+```
+
+No Windows, configure o Agendador de Tarefas para executar diariamente às 23:59
+o interpretador `.venv\Scripts\python.exe`, com argumento
+`-m scripts.processar_gamificacao` e diretório de trabalho na raiz do projeto.
+O campo `gamificacao_processada_em` impede crédito duplicado se o job for
+executado novamente no mesmo dia.
 
 ### `alimento_taco` — Banco Nutricional TACO (RF02.2)
 
