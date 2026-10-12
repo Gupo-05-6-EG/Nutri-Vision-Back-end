@@ -10,10 +10,11 @@ tasks (`streak`, `xp`, `meta_dias`, `treino`, ...) entram por migration depois:
 veio (hoje so `harris_benedict`), como previsto no DER.
 """
 
+from datetime import date
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, Integer, Numeric, String
+from sqlalchemy import CheckConstraint, Date, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -45,6 +46,8 @@ class Paciente(Base):
         CheckConstraint("altura_cm > 0", name="altura_cm_positiva"),
         CheckConstraint("idade > 0", name="idade_positiva"),
         CheckConstraint("meta_kcal >= 0", name="meta_kcal_nao_negativa"),
+        CheckConstraint("streak >= 0", name="streak_nao_negativa"),
+        CheckConstraint("xp >= 0", name="xp_nao_negativo"),
     )
 
     # Sem autoincrement: o id do paciente e o id do usuario (Task 1.2 adiciona a
@@ -60,3 +63,7 @@ class Paciente(Base):
 
     meta_kcal: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     origem_meta: Mapped[str | None] = mapped_column(String(30), nullable=True)
+
+    streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    xp: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    gamificacao_processada_em: Mapped[date | None] = mapped_column(Date, nullable=True)

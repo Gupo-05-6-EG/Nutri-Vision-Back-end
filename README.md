@@ -158,8 +158,31 @@ explicitamente para sobrepor a sugestão.
 | `nivel_atividade` | varchar(30) | `sedentario` \| `leve` \| `moderado` \| `intenso` \| `muito_intenso` |
 | `meta_kcal` | numeric(6,2) | teto calórico diário vigente; `>= 0` |
 | `origem_meta` | varchar(30) | de onde veio a meta (hoje só `harris_benedict`) |
+| `streak` | int | dias consecutivos que cumpriram a regra diária (inicia em `0`) |
+| `xp` | int | pontos acumulados; cada dia válido soma `50` |
+| `gamificacao_processada_em` | date | último dia fechado, impede crédito duplicado |
 
 As colunas são opcionais porque o cadastro (Task 1.2) cria o paciente antes da triagem.
+
+`streak` e `xp` guardam, respectivamente, os dias consecutivos que cumpriram a
+regra de gamificação e os pontos acumulados. O fechamento diário considera as
+refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo de
+até 30% de `meta_kcal`, soma 1 ao streak e 50 XP; caso contrário, zera o streak.
+O fechamento não altera XP quando a regra não é cumprida. Pacientes sem meta
+calórica também não cumprem a regra.
+
+O job pode ser agendado pelo cron do ambiente para 23:59 (horário de São Paulo):
+
+```cron
+CRON_TZ=America/Sao_Paulo
+59 23 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_gamificacao
+```
+
+No Windows, configure o Agendador de Tarefas para executar diariamente às 23:59
+o interpretador `.venv\Scripts\python.exe`, com argumento
+`-m scripts.processar_gamificacao` e diretório de trabalho na raiz do projeto.
+O campo `gamificacao_processada_em` impede crédito duplicado se o job for
+executado novamente no mesmo dia.
 
 ### `alimento_taco` — Banco Nutricional TACO (RF02.2)
 
@@ -184,6 +207,8 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 |---|---|---|
 | GET | `/api/v1/health` | Liveness |
 | GET | `/api/v1/health/db` | Readiness (consulta o banco) |
+| POST | `/api/v1/linking-code` | Gera um codigo de vinculacao de 6 digitos para o nutricionista autenticado |
+| POST | `/api/v1/link` | Resgata um codigo de vinculacao e cria o vinculo paciente-nutricionista |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
 | GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
@@ -193,6 +218,10 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | GET | `/docs` | Swagger UI |
+
+> Os endpoints de vinculação usam o JWT do `Authorization: Bearer ...` para
+> identificar o perfil e o autor do código. O código é numérico, tem 6 dígitos
+> e expira após o período definido em `LINKING_CODE_EXPIRE_MINUTES`.
 
 > **`paciente_id` por parâmetro é temporário.** Ainda não existe autenticação: a
 > Task 1.2 passa a tirar o paciente do token JWT e a Task 1.6 aplica o controle
@@ -265,6 +294,24 @@ curl -X POST http://localhost:8000/api/v1/pacientes/1/triagem   -H 'Content-Type
 ```
 
 Dados inválidos devolvem `422`.
+
+### Mecanismo de vinculação (RF15)
+
+Permite o vínculo entre paciente e nutricionista por meio de um código temporário de 6 dígitos:
+
+- `POST /api/v1/linking-code`: Exige autenticação de nutricionista (`Authorization: Bearer <token>`). Gera um código numérico de 6 dígitos que expira conforme `LINKING_CODE_EXPIRE_MINUTES`.
+- `POST /api/v1/link`: Exige autenticação de paciente. Recebe `{"codigo": "123456"}` e cria o vínculo de forma atômica e idempotente.
+
+**Comportamento de erro e respostas HTTP:**
+- `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, perfil/sub ausente ou inválido, ou usuário inexistente.
+- `403 Forbidden`: perfil incompatível (paciente tentando gerar código, nutricionista tentando resgatar, ou paciente tentando resgatar código gerado por ele mesmo).
+- `404 Not Found`: código não encontrado.
+- `409 Conflict`: código já utilizado por outro paciente.
+- `410 Gone`: código expirado.
+- `422 Unprocessable Entity`: formato inválido (ex.: código não numérico ou com tamanho diferente de 6 dígitos).
+
+**Migrations e Integridade Referencial:**
+A migration `a1b2c3d4e5f6` unifica os branches concorrentes do Alembic e adiciona integridade referencial com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
 
 ### Valores nutricionais
 
