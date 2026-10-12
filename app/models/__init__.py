@@ -8,6 +8,7 @@ from app.db.base import Base
 from app.models.alimento_taco import AlimentoTaco
 from app.models.paciente import Genero, NivelAtividade, Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
+from app.models.usuario import Nutricionista, Perfil, Usuario
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
 
 __all__ = [
@@ -17,9 +18,12 @@ __all__ = [
     "Genero",
     "ItemRefeicao",
     "NivelAtividade",
+    "Nutricionista",
     "Paciente",
-    "StatusCodigoVinculacao",
+    "Perfil",
     "Refeicao",
-    "Vinculo",
+    "StatusCodigoVinculacao",
     "TipoRefeicao",
+    "Usuario",
+    "Vinculo",
 ]

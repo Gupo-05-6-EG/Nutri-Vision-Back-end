@@ -272,6 +272,24 @@ curl -X POST http://localhost:8000/api/v1/pacientes/1/triagem   -H 'Content-Type
 
 Dados inválidos devolvem `422`.
 
+### Mecanismo de vinculação (RF15)
+
+Permite o vínculo entre paciente e nutricionista por meio de um código temporário de 6 dígitos:
+
+- `POST /api/v1/linking-code`: Exige autenticação de nutricionista (`Authorization: Bearer <token>`). Gera um código numérico de 6 dígitos que expira conforme `LINKING_CODE_EXPIRE_MINUTES`.
+- `POST /api/v1/link`: Exige autenticação de paciente. Recebe `{"codigo": "123456"}` e cria o vínculo de forma atômica e idempotente.
+
+**Comportamento de erro e respostas HTTP:**
+- `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, perfil/sub ausente ou inválido, ou usuário inexistente.
+- `403 Forbidden`: perfil incompatível (paciente tentando gerar código, nutricionista tentando resgatar, ou paciente tentando resgatar código gerado por ele mesmo).
+- `404 Not Found`: código não encontrado.
+- `409 Conflict`: código já utilizado por outro paciente.
+- `410 Gone`: código expirado.
+- `422 Unprocessable Entity`: formato inválido (ex.: código não numérico ou com tamanho diferente de 6 dígitos).
+
+**Migrations e Integridade Referencial:**
+A migration `a1b2c3d4e5f6` unifica os branches concorrentes do Alembic e adiciona integridade referencial com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
+
 ### Valores nutricionais
 
 No banco são `numeric(8,2)` e no código `Decimal` — as somas são exatas, sem erro

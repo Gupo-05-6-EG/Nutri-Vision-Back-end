@@ -1,19 +1,16 @@
 """Regras de negocio do mecanismo de vinculacao (Task 1.4)."""
 
-from __future__ import annotations
-
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
 from secrets import randbelow
-from threading import Lock
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import PerfilUsuario, UsuarioAutenticado
+from app.core.security import Perfil, UsuarioAutenticado
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
 
 
@@ -49,19 +46,6 @@ def _agora() -> datetime:
     return datetime.now(UTC)
 
 
-_LOCKS_POR_CODIGO: dict[str, Lock] = {}
-_LOCKS_GUARD = Lock()
-
-
-def _lock_do_codigo(codigo: str) -> Lock:
-    with _LOCKS_GUARD:
-        lock = _LOCKS_POR_CODIGO.get(codigo)
-        if lock is None:
-            lock = Lock()
-            _LOCKS_POR_CODIGO[codigo] = lock
-        return lock
-
-
 def _expiracao_padrao() -> datetime:
     minutos = get_settings().LINKING_CODE_EXPIRE_MINUTES
     return _agora() + timedelta(minutes=minutos)
@@ -69,7 +53,7 @@ def _expiracao_padrao() -> datetime:
 
 def _hash_codigo(codigo: str) -> str:
     segredo = get_settings().SECRET_KEY
-    return sha256(f"{segredo}:{codigo}".encode("utf-8")).hexdigest()
+    return sha256(f"{segredo}:{codigo}".encode()).hexdigest()
 
 
 def _em_utc(momento: datetime) -> datetime:
@@ -83,17 +67,21 @@ def _gerar_codigo() -> str:
 
 
 def gerar_codigo_vinculacao(db: Session, usuario: UsuarioAutenticado) -> CodigoVinculacao:
-    if usuario.perfil != PerfilUsuario.NUTRICIONISTA:
+    if usuario.perfil != Perfil.NUTRICIONISTA:
         raise PerfilIncompativel
 
-    # Cada nutricionista mantém um unico codigo ativo por vez; gerar um novo
+    # Cada nutricionista mantem um unico codigo ativo por vez; gerar um novo
     # invalida os codigos ativos anteriores daquele proprietario.
-    codigos_ativos = db.execute(
-        select(CodigoVinculacao).where(
-            CodigoVinculacao.nutricionista_id == usuario.id,
-            CodigoVinculacao.status == StatusCodigoVinculacao.ATIVO.value,
+    codigos_ativos = (
+        db.execute(
+            select(CodigoVinculacao).where(
+                CodigoVinculacao.nutricionista_id == usuario.id,
+                CodigoVinculacao.status == StatusCodigoVinculacao.ATIVO.value,
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     for codigo_ativo in codigos_ativos:
         codigo_ativo.status = StatusCodigoVinculacao.EXPIRADO.value
 
@@ -115,7 +103,11 @@ def gerar_codigo_vinculacao(db: Session, usuario: UsuarioAutenticado) -> CodigoV
             expira_em=_expiracao_padrao(),
         )
         db.add(registro)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            continue
         db.refresh(registro)
         registro.codigo_em_texto = codigo  # type: ignore[attr-defined]
         return registro
@@ -135,53 +127,85 @@ def _buscar_codigo_ativo(db: Session, codigo: str) -> CodigoVinculacao | None:
 def resgatar_codigo_vinculacao(
     db: Session, usuario: UsuarioAutenticado, codigo: str
 ) -> VinculoResgatado:
-    if usuario.perfil != PerfilUsuario.PACIENTE:
+    if usuario.perfil != Perfil.PACIENTE:
         raise PerfilIncompativel
 
-    with _lock_do_codigo(codigo):
-        registro = _buscar_codigo_ativo(db, codigo)
-        if registro is None:
-            raise CodigoVinculacaoNaoEncontrado
+    registro = _buscar_codigo_ativo(db, codigo)
+    if registro is None:
+        raise CodigoVinculacaoNaoEncontrado
 
-        agora = _agora()
-        expira_em = _em_utc(registro.expira_em)
-        if registro.status == StatusCodigoVinculacao.EXPIRADO.value or expira_em <= agora:
-            registro.status = StatusCodigoVinculacao.EXPIRADO.value
-            db.commit()
-            raise CodigoVinculacaoExpirado
-        if registro.status != StatusCodigoVinculacao.ATIVO.value:
-            raise CodigoVinculacaoJaUtilizado
-        if registro.nutricionista_id == usuario.id:
-            raise PerfilIncompativel
-
-        vinculo_existente = db.execute(
-            select(Vinculo).where(
-                Vinculo.nutricionista_id == registro.nutricionista_id,
-                Vinculo.paciente_id == usuario.id,
-            )
-        ).scalar_one_or_none()
-
-        if vinculo_existente is None:
-            vinculo = Vinculo(nutricionista_id=registro.nutricionista_id, paciente_id=usuario.id)
-            db.add(vinculo)
-            try:
-                db.flush()
-            except IntegrityError as exc:
-                db.rollback()
-                raise VinculoDuplicado from exc
-        else:
-            vinculo = vinculo_existente
-
-        registro.status = StatusCodigoVinculacao.RESGATADO.value
-        registro.paciente_id = usuario.id
-        registro.resgatado_em = agora
+    agora = _agora()
+    expira_em = _em_utc(registro.expira_em)
+    if registro.status == StatusCodigoVinculacao.EXPIRADO.value or expira_em <= agora:
+        registro.status = StatusCodigoVinculacao.EXPIRADO.value
         db.commit()
-        db.refresh(registro)
-        db.refresh(vinculo)
+        raise CodigoVinculacaoExpirado
 
-        return VinculoResgatado(
-            nutricionista_id=registro.nutricionista_id,
-            nutricionista_nome=registro.nutricionista_nome,
-            nutricionista_foto_url=registro.nutricionista_foto_url,
-            vinculado_em=_em_utc(vinculo.criado_em),
+    if registro.status != StatusCodigoVinculacao.ATIVO.value:
+        raise CodigoVinculacaoJaUtilizado
+
+    if registro.nutricionista_id == usuario.id:
+        raise PerfilIncompativel
+
+    # Atualizacao condicional atomica para concorrencia multi-processo/worker
+    stmt = (
+        update(CodigoVinculacao)
+        .where(
+            CodigoVinculacao.id == registro.id,
+            CodigoVinculacao.status == StatusCodigoVinculacao.ATIVO.value,
         )
+        .values(
+            status=StatusCodigoVinculacao.RESGATADO.value,
+            paciente_id=usuario.id,
+            resgatado_em=agora,
+        )
+    )
+    res_upd = db.execute(stmt)
+    if res_upd.rowcount == 0:
+        db.rollback()
+        raise CodigoVinculacaoJaUtilizado
+
+    vinculo_existente = db.execute(
+        select(Vinculo).where(
+            Vinculo.nutricionista_id == registro.nutricionista_id,
+            Vinculo.paciente_id == usuario.id,
+        )
+    ).scalar_one_or_none()
+
+    if vinculo_existente is None:
+        vinculo = Vinculo(
+            nutricionista_id=registro.nutricionista_id,
+            paciente_id=usuario.id,
+        )
+        db.add(vinculo)
+        try:
+            db.flush()
+        except IntegrityError as exc:
+            db.rollback()
+            vinculo_recarregado = db.execute(
+                select(Vinculo).where(
+                    Vinculo.nutricionista_id == registro.nutricionista_id,
+                    Vinculo.paciente_id == usuario.id,
+                )
+            ).scalar_one_or_none()
+            if vinculo_recarregado is None:
+                raise VinculoDuplicado from exc
+            vinculo = vinculo_recarregado
+    else:
+        vinculo = vinculo_existente
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise VinculoDuplicado from exc
+
+    db.refresh(registro)
+    db.refresh(vinculo)
+
+    return VinculoResgatado(
+        nutricionista_id=registro.nutricionista_id,
+        nutricionista_nome=registro.nutricionista_nome,
+        nutricionista_foto_url=registro.nutricionista_foto_url,
+        vinculado_em=_em_utc(vinculo.criado_em),
+    )

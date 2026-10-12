@@ -1,15 +1,17 @@
 """Fixtures compartilhadas dos testes.
 
 Os testes rodam sobre SQLite em memoria (TEST_DATABASE_URL), por isso nao
-dependem de um Postgres no CI. Os modelos usam apenas tipos portaveis.
+dependem de um Postgres no CI. Os modelos usam apenas tipos portaveis, e as FKs
+sao ligadas no SQLite (que vem com elas desligadas) para os testes barrarem o
+mesmo que o Postgres barra.
 """
 
 from collections.abc import Generator
 
-import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+import pytest
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -26,6 +28,12 @@ def engine():
     if url.startswith("sqlite"):
         kwargs = {"connect_args": {"check_same_thread": False}, "poolclass": StaticPool}
     eng = create_engine(url, future=True, **kwargs)
+    if url.startswith("sqlite"):
+
+        @event.listens_for(eng, "connect")
+        def _liga_fks(conexao_dbapi, _registro) -> None:  # type: ignore[no-untyped-def]
+            conexao_dbapi.execute("PRAGMA foreign_keys=ON")
+
     Base.metadata.create_all(eng)
     yield eng
     Base.metadata.drop_all(eng)
