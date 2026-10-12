@@ -1,21 +1,24 @@
 """Testes do mecanismo de vinculacao (Task 1.4)."""
 
-from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime, timedelta
 
 import jwt
 import pytest
 import sqlalchemy as sa
-from alembic.config import Config
-from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from app.core.config import get_settings
 from app.core.security import Perfil, UsuarioAutenticado, create_access_token
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
-from app.services.vinculos import _hash_codigo, resgatar_codigo_vinculacao
+from app.services.vinculos import (
+    CodigoVinculacaoJaUtilizado,
+    _hash_codigo,
+    resgatar_codigo_vinculacao,
+)
 
 ROTA_CODIGO = "/api/v1/linking-code"
 ROTA_VINCULO = "/api/v1/link"
@@ -211,7 +214,17 @@ class TestResgateCodigo:
         assert "token" not in corpo
         assert "senha" not in resposta.text.lower()
 
-    def test_duas_tentativas_simultaneas_nao_criam_vinculos_inconsistentes(self, engine) -> None:
+    def test_duas_tentativas_simultaneas_nao_criam_vinculos_inconsistentes(
+        self, engine, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Simula a corrida de forma deterministica, sem threads.
+
+        O engine de teste (SQLite em memoria + StaticPool) usa uma unica
+        conexao, entao threads de verdade se atrapalhariam e o resultado
+        mudaria a cada execucao. Aqui o segundo paciente le o codigo ainda
+        ATIVO, o primeiro o resgata, e so entao o segundo tenta resgatar: o
+        UPDATE condicional atomico precisa barrar a segunda tentativa.
+        """
         codigo = "777777"
         SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
@@ -229,37 +242,56 @@ class TestResgateCodigo:
         sessao_inicial.commit()
         sessao_inicial.close()
 
-        def _resgatar(paciente_id: int) -> str:
-            sessao = SessionLocal()
-            try:
-                resultado = resgatar_codigo_vinculacao(
-                    sessao,
-                    UsuarioAutenticado(id=paciente_id, perfil=Perfil.PACIENTE, nome="Joao"),
+        sessao_a = SessionLocal()
+        sessao_b = SessionLocal()
+        try:
+            # B le o codigo antes de A resgatar: B enxerga o registro como ATIVO.
+            registro_desatualizado = (
+                sessao_b.query(CodigoVinculacao)
+                .filter(CodigoVinculacao.codigo_hash == _hash_codigo(codigo))
+                .one()
+            )
+            assert registro_desatualizado.status == StatusCodigoVinculacao.ATIVO.value
+
+            resultado_a = resgatar_codigo_vinculacao(
+                sessao_a,
+                UsuarioAutenticado(id=11, perfil=Perfil.PACIENTE, nome="Joao"),
+                codigo,
+            )
+            assert resultado_a.nutricionista_id == 10
+
+            # Forca B a trabalhar com a leitura antiga, como numa corrida real.
+            monkeypatch.setattr(
+                "app.services.vinculos._buscar_codigo_ativo",
+                lambda db, codigo_informado: registro_desatualizado,
+            )
+            with pytest.raises(CodigoVinculacaoJaUtilizado):
+                resgatar_codigo_vinculacao(
+                    sessao_b,
+                    UsuarioAutenticado(id=12, perfil=Perfil.PACIENTE, nome="Maria"),
                     codigo,
                 )
-                return f"ok:{resultado.nutricionista_id}"
-            except Exception as exc:  # noqa: BLE001 - teste verifica resultado agregado
-                return exc.__class__.__name__
-            finally:
-                sessao.close()
 
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            resultados = list(executor.map(_resgatar, [11, 12]))
-
-        assert resultados.count("ok:10") == 1
-        sessao_verificacao = SessionLocal()
-        try:
-            assert (
-                sessao_verificacao.query(Vinculo)
+            vinculos = (
+                sessao_a.query(Vinculo)
                 .filter(
                     Vinculo.nutricionista_id == 10,
                     Vinculo.paciente_id.in_([11, 12]),
                 )
-                .count()
-                == 1
+                .all()
             )
+            assert [v.paciente_id for v in vinculos] == [11]
         finally:
-            sessao_verificacao.close()
+            sessao_a.close()
+            sessao_b.close()
+            # Esses dados foram commitados fora da transacao isolada dos testes.
+            limpeza = SessionLocal()
+            limpeza.query(Vinculo).filter(Vinculo.nutricionista_id == 10).delete()
+            limpeza.query(CodigoVinculacao).filter(
+                CodigoVinculacao.codigo_hash == _hash_codigo(codigo)
+            ).delete()
+            limpeza.commit()
+            limpeza.close()
 
 
 class TestValidacaoJWT:
@@ -342,9 +374,7 @@ class TestValidacaoJWT:
             settings.SECRET_KEY,
             algorithm=settings.ALGORITHM,
         )
-        resposta = client.post(
-            ROTA_CODIGO, headers={"Authorization": f"Bearer {token_sem_nome}"}
-        )
+        resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {token_sem_nome}"})
         assert resposta.status_code == 200
 
 
@@ -355,8 +385,7 @@ class TestIntegridadeReferencial:
             with pytest.raises(IntegrityError):
                 conn.execute(
                     sa.text(
-                        "INSERT INTO vinculos (nutricionista_id, paciente_id) "
-                        "VALUES (999, 888)"
+                        "INSERT INTO vinculos (nutricionista_id, paciente_id) " "VALUES (999, 888)"
                     )
                 )
 
