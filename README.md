@@ -192,6 +192,7 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
+| POST | `/api/v1/calculo-nutricional` | Mapeia classes da IA para a TACO e calcula kcal/macros por porção (RF03, RF20, RF21) |
 | GET | `/docs` | Swagger UI |
 
 > **`paciente_id` por parâmetro é temporário.** Ainda não existe autenticação: a
@@ -214,6 +215,25 @@ curl -X POST http://localhost:8000/api/v1/refeicoes   -H 'Content-Type: applicat
 
 curl 'http://localhost:8000/api/v1/refeicoes/consumo-diario?paciente_id=1&data=2026-09-20'
 ```
+
+### Cálculo nutricional por porção (RF03, RF20, RF21)
+
+`POST /api/v1/calculo-nutricional` recebe as classes reconhecidas pelo modelo de IA,
+o método de preparo e as gramas, e devolve a tabela nutricional da refeição (kcal,
+proteínas, carboidratos e gorduras por item e total). Não grava nada.
+
+```json
+{"itens": [{"classe": "arroz", "metodo_preparo": "cozido", "gramas": 150}]}
+```
+
+- `metodo_preparo`: `cru` \| `cozido` \| `frito`.
+- O de-para (classe + preparo → alimento da TACO) fica em
+  [`data/mapeamento_ia_taco.csv`](data/mapeamento_ia_taco.csv); para suportar uma
+  classe nova do modelo basta adicionar linhas lá (o nome precisa existir em `data/taco.csv`).
+- Fórmula: `nutriente = valor_por_100g × gramas / 100`, 2 casas (meio para cima); o total
+  soma os itens já arredondados.
+- Combinação sem mapeamento → `422`; alimento do de-para ausente em `alimento_taco`
+  (importação não rodada) → `404`.
 
 ### Cálculo basal (RF14)
 
