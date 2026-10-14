@@ -178,6 +178,30 @@ NEPA/UNICAMP) — veja [Populando a TACO](#populando-a-taco). O `alimento_id` em
 `itens_refeicao` (ligando um item da refeição a um alimento desta tabela) entra
 numa task futura, quando o front passar a montar refeições a partir da busca.
 
+### `alimento_personalizado` — alimentos criados pelo paciente (RF22)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | indexado; a FK para `usuarios` entra na Task 1.2 |
+| `nome` | varchar(150) | indexado; único por paciente (`uq_alimento_personalizado_paciente_nome`) |
+| `kcal_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `carbs_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `prot_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `gord_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `criado_em` | timestamptz | auditoria |
+
+Mesmo formato por 100g da `alimento_taco`. Na API, `kcal_100g` vai até 900, cada macro
+até 100 e carboidratos + proteínas + gorduras até 100 (g por 100g de alimento).
+
+**Busca unificada.** `GET /api/v1/alimentos?nome=` devolve, numa lista só e em ordem
+alfabética, alimentos da TACO e os personalizados do `paciente_id` informado. Sem
+`paciente_id` só vem TACO: um alimento personalizado nunca aparece para outro paciente.
+Cada item traz `origem` (`taco` \| `personalizado`) e `categoria` (`"Personalizado"` nos
+personalizados); como os ids se repetem entre as duas tabelas, o alimento é identificado
+por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) → `409`.
+`GET /api/v1/alimentos-taco` continua buscando só na TACO.
+
 ## Endpoints
 
 | Método | Rota | Descrição |
@@ -192,6 +216,8 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
+| POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
+| GET | `/api/v1/alimentos?nome=&paciente_id=` | Busca unificada: TACO + alimentos personalizados do paciente (RF22) |
 | POST | `/api/v1/calculo-nutricional` | Mapeia classes da IA para a TACO e calcula kcal/macros por porção (RF03, RF20, RF21) |
 | GET | `/docs` | Swagger UI |
 
