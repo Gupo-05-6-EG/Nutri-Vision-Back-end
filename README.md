@@ -237,6 +237,8 @@ por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) →
 | POST | `/api/v1/auth/cadastro/nutricionista` | Cadastra nutricionista e devolve o token (RF13) |
 | POST | `/api/v1/auth/login` | Login com email e senha (RF13) |
 | GET | `/api/v1/auth/me` | Usuário do token (🔒 Bearer) |
+| POST | `/api/v1/linking-code` | Gera um codigo de vinculacao de 6 digitos para o nutricionista autenticado |
+| POST | `/api/v1/link` | Resgata um codigo de vinculacao e cria o vinculo paciente-nutricionista |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
 | GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
@@ -249,6 +251,10 @@ por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) →
 | GET | `/api/v1/alimentos?nome=&paciente_id=` | Busca unificada: TACO + alimentos personalizados do paciente (RF22) |
 | POST | `/api/v1/calculo-nutricional` | Mapeia classes da IA para a TACO e calcula kcal/macros por porção (RF03, RF20, RF21) |
 | GET | `/docs` | Swagger UI |
+
+> Os endpoints de vinculação exigem o token do login (`Authorization: Bearer ...`):
+> o perfil e o autor do código vêm do usuário do token. O código é numérico, tem
+> 6 dígitos e expira após o período definido em `LINKING_CODE_EXPIRE_MINUTES`.
 
 > **`paciente_id` por parâmetro é temporário.** O login já existe, mas refeições e
 > triagem ainda não exigem token: a Task 1.6 (RNF06) passa a exigir e a validar se
@@ -310,6 +316,15 @@ from app.api.deps import UsuarioAtual
 
 @router.get("/algo")
 def algo(usuario: UsuarioAtual, db: DbSession): ...
+```
+
+Para aceitar só um perfil (`403` para o outro), use `exigir_perfil`:
+
+```python
+from app.api.deps import exigir_perfil
+
+@router.post("/so-nutri")
+def so_nutri(usuario: Annotated[Usuario, Depends(exigir_perfil(Perfil.NUTRICIONISTA))]): ...
 ```
 
 ### Exemplo
@@ -398,6 +413,24 @@ curl -X POST http://localhost:8000/api/v1/pacientes/1/triagem   -H 'Content-Type
 ```
 
 Dados inválidos devolvem `422`.
+
+### Mecanismo de vinculação (RF15)
+
+Permite o vínculo entre paciente e nutricionista por meio de um código temporário de 6 dígitos:
+
+- `POST /api/v1/linking-code`: Exige autenticação de nutricionista (`Authorization: Bearer <token>`). Gera um código numérico de 6 dígitos que expira conforme `LINKING_CODE_EXPIRE_MINUTES`.
+- `POST /api/v1/link`: Exige autenticação de paciente. Recebe `{"codigo": "123456"}` e cria o vínculo de forma atômica e idempotente.
+
+**Comportamento de erro e respostas HTTP:**
+- `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, `sub` ausente ou inválido, ou usuário inexistente.
+- `403 Forbidden`: perfil incompatível (paciente tentando gerar código, nutricionista tentando resgatar, ou paciente tentando resgatar código gerado por ele mesmo).
+- `404 Not Found`: código não encontrado.
+- `409 Conflict`: código já utilizado por outro paciente.
+- `410 Gone`: código expirado.
+- `422 Unprocessable Entity`: formato inválido (ex.: código não numérico ou com tamanho diferente de 6 dígitos).
+
+**Migrations e Integridade Referencial:**
+A migration `9c2f8f2d7d1a` (depois da `4895cf62af9e`, que cria `usuarios` e `nutricionistas`) cria `codigo_vinculacao` e `vinculos` com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
 
 ### Valores nutricionais
 

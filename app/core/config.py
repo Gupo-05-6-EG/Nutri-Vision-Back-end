@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 dias
 
+    # Vinculacao paciente-nutricionista (Task 1.4)
+    LINKING_CODE_EXPIRE_MINUTES: int = 60 * 24
+
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:5173",

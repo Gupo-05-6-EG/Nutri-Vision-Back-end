@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.security import gerar_hash_senha
 from app.models.paciente import Paciente
-from app.models.usuario import Perfil, Usuario
+from app.models.usuario import Nutricionista, Perfil, Usuario
 
 SENHA_PADRAO = "senha-forte-123"
 # Calculado uma vez: bcrypt e lento de proposito, e cada teste cria pacientes.
@@ -71,3 +71,23 @@ def criar_paciente(db: Session, paciente_id: int) -> Paciente:
     db.add(paciente)
     db.commit()
     return paciente
+
+
+def criar_nutricionista(
+    db: Session, nutricionista_id: int, nome: str | None = None
+) -> Nutricionista:
+    """Cria usuario + nutricionista direto no banco, com id fixo (sem passar pela API)."""
+    db.add(
+        Usuario(
+            id=nutricionista_id,
+            nome=nome or f"Nutricionista {nutricionista_id}",
+            email=f"nutri{nutricionista_id}@exemplo.com",
+            senha_hash=HASH_SENHA_PADRAO,
+            perfil=Perfil.NUTRICIONISTA.value,
+        )
+    )
+    db.flush()
+    nutricionista = Nutricionista(id=nutricionista_id, crn=f"CRN-3 {nutricionista_id:05d}")
+    db.add(nutricionista)
+    db.commit()
+    return nutricionista

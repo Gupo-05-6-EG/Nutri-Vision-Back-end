@@ -4,7 +4,11 @@ Uso numa rota protegida:
 
     def minha_rota(usuario: UsuarioAtual, db: DbSession): ...
 
-A regra de quem pode ver o que (perfil e vinculo) e da Task 1.6 (RNF06).
+Para restringir a um perfil (ex.: so nutricionista):
+
+    def minha_rota(usuario: Annotated[Usuario, Depends(exigir_perfil(Perfil.NUTRICIONISTA))]): ...
+
+A regra de quem pode ver o que pelo vinculo e da Task 1.6 (RNF06).
 """
 
 from typing import Annotated
@@ -14,7 +18,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.core.security import TokenInvalido, ler_token_acesso
 from app.db.deps import DbSession
-from app.models.usuario import Usuario
+from app.models.usuario import Perfil, Usuario
 from app.services import auth as servico
 
 # auto_error=False para responder 401 (e nao o 403 padrao do HTTPBearer) quando
@@ -45,3 +49,16 @@ def usuario_atual(
 
 
 UsuarioAtual = Annotated[Usuario, Depends(usuario_atual)]
+
+
+def exigir_perfil(perfil: Perfil):
+    """Dependencia que so deixa passar o usuario autenticado com o perfil dado (403)."""
+
+    def _dependencia(usuario: UsuarioAtual) -> Usuario:
+        if usuario.perfil != perfil:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Perfil nao autorizado"
+            )
+        return usuario
+
+    return _dependencia
