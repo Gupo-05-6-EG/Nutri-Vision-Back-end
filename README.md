@@ -250,6 +250,20 @@ personalizados); como os ids se repetem entre as duas tabelas, o alimento é ide
 por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) → `409`.
 `GET /api/v1/alimentos-taco` continua buscando só na TACO.
 
+### `planos_alimentares`, `refeicoes_plano`, `alimentos_refeicao_plano` — plano alimentar (RF09.1)
+
+Plano prescrito pelo nutricionista: blocos de refeição, cada um com metas e alimentos.
+
+| Tabela | Colunas principais |
+|---|---|
+| `planos_alimentares` | `paciente_id` (FK, `CASCADE`), `nutricionista_id` (FK, `SET NULL`), `titulo`, `observacao`, `ativo`, `criado_em` |
+| `refeicoes_plano` | `plano_id` (FK, `CASCADE`), `ordem`, `nome` (livre: "Ceia", "Lanche da tarde"...), `horario` (opcional), `meta_kcal`, `meta_proteinas_g`, `observacao` |
+| `alimentos_refeicao_plano` | `refeicao_plano_id` (FK, `CASCADE`), `ordem`, `nome_alimento`, `quantidade_g` (`> 0`), `alimento_taco_id` (FK opcional, `SET NULL`) |
+
+Cada paciente tem **um plano ativo**: prescrever outro desativa o anterior (fica no
+banco com `ativo = false`). As metas do dia (`totais`) são a soma dos blocos e não são
+gravadas. O versionamento com auditoria é da Task 5.3 (RF08).
+
 ## Endpoints
 
 | Método | Rota | Descrição |
@@ -269,6 +283,8 @@ por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) →
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
+| POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve um plano alimentar e o torna o plano ativo (RF09.1, 🔒 nutricionista vinculado) |
+| GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (RF09.1, 🔒 o próprio paciente ou nutricionista vinculado) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
 | GET | `/api/v1/alimentos?nome=&paciente_id=` | Busca unificada: TACO + alimentos personalizados do paciente (RF22) |
@@ -454,6 +470,42 @@ Permite o vínculo entre paciente e nutricionista por meio de um código tempor�
 
 **Migrations e Integridade Referencial:**
 A migration `9c2f8f2d7d1a` (depois da `4895cf62af9e`, que cria `usuarios` e `nutricionistas`) cria `codigo_vinculacao` e `vinculos` com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
+
+### Plano alimentar (RF09.1)
+
+`POST /api/v1/pacientes/{paciente_id}/planos` (token de nutricionista com vínculo ao paciente):
+
+```json
+{
+  "titulo": "Reeducação alimentar",
+  "observacao": "Beber 2L de água por dia",
+  "refeicoes": [
+    {
+      "nome": "Café da manhã",
+      "horario": "07:30",
+      "meta_kcal": 400,
+      "meta_proteinas_g": 20,
+      "alimentos": [
+        { "nome_alimento": "Pão integral", "quantidade_g": 50 },
+        { "nome_alimento": "Arroz, integral, cozido", "quantidade_g": 100, "alimento_taco_id": 3 }
+      ]
+    }
+  ]
+}
+```
+
+A resposta (`201`) traz o plano com os ids, os blocos na ordem enviada e `totais`
+(`meta_kcal`, `meta_proteinas_g`). Regras: 1 a 12 blocos, cada um com 1 a 50 alimentos;
+`meta_kcal` até 10000 e `meta_proteinas_g` até 1000 por bloco; `quantidade_g` de 0 a
+5000 (exclusivo no zero).
+
+| Situação | Resposta |
+|---|---|
+| Sem token / token inválido | `401` |
+| Paciente tentando prescrever, ou nutricionista sem vínculo | `403` |
+| Paciente não existe | `404` |
+| `alimento_taco_id` inexistente ou dados inválidos | `422` |
+| `GET .../planos/ativo` sem plano prescrito | `404` `"Paciente sem plano ativo"` |
 
 ### Valores nutricionais
 
