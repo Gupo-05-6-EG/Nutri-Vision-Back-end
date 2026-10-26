@@ -27,8 +27,15 @@ from app.services.calculo_basal import (
     calcular_teto_calorico,
     calcular_tmb,
 )
+from tests import factories
 
 MAX_NUMERIC_6_2 = Decimal("9999.99")
+
+
+@pytest.fixture(autouse=True)
+def _pacientes(db: Session) -> None:
+    for paciente_id in (1, 2, 7):
+        factories.criar_paciente(db, paciente_id)
 
 
 def _payload(**alteracoes: Any) -> dict[str, Any]:
@@ -194,7 +201,10 @@ class TestValidacao:
         resposta = client.post(_rota(), json=_payload(**alteracao))
 
         assert resposta.status_code == 422
-        assert db.get(Paciente, 1) is None, "nada deve ser salvo quando a triagem e invalida"
+        db.expire_all()
+        paciente = db.get(Paciente, 1)
+        assert paciente is not None
+        assert paciente.meta_kcal is None, "nada deve ser salvo quando a triagem e invalida"
 
     @pytest.mark.parametrize(
         "campo", ["peso_kg", "altura_cm", "idade", "genero", "nivel_atividade"]
@@ -206,6 +216,12 @@ class TestValidacao:
         resposta = client.post(_rota(), json=corpo)
 
         assert resposta.status_code == 422
+
+    def test_paciente_nao_cadastrado_da_404(self, client: TestClient, db: Session) -> None:
+        resposta = client.post(_rota(999), json=_payload())
+
+        assert resposta.status_code == 404
+        assert db.get(Paciente, 999) is None, "a triagem nao cria paciente"
 
     @pytest.mark.parametrize("paciente_id", ["0", "-1", "abc"])
     def test_recusa_paciente_id_invalido(self, client: TestClient, paciente_id: str) -> None:

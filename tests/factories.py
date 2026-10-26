@@ -3,6 +3,16 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from sqlalchemy.orm import Session
+
+from app.core.security import gerar_hash_senha
+from app.models.paciente import Paciente
+from app.models.usuario import Perfil, Usuario
+
+SENHA_PADRAO = "senha-forte-123"
+# Calculado uma vez: bcrypt e lento de proposito, e cada teste cria pacientes.
+HASH_SENHA_PADRAO = gerar_hash_senha(SENHA_PADRAO)
+
 
 def item(
     nome: str = "Arroz branco cozido",
@@ -39,3 +49,25 @@ def refeicao(
     if tipo is not None:
         payload["tipo"] = tipo
     return payload
+
+
+def cadastro(email: str = "ana@exemplo.com", senha: str = SENHA_PADRAO, **extra: Any) -> dict:
+    return {"nome": "Ana Souza", "email": email, "senha": senha, **extra}
+
+
+def criar_paciente(db: Session, paciente_id: int) -> Paciente:
+    """Cria usuario + paciente direto no banco, com id fixo (sem passar pela API)."""
+    db.add(
+        Usuario(
+            id=paciente_id,
+            nome=f"Paciente {paciente_id}",
+            email=f"paciente{paciente_id}@exemplo.com",
+            senha_hash=HASH_SENHA_PADRAO,
+            perfil=Perfil.PACIENTE.value,
+        )
+    )
+    db.flush()
+    paciente = Paciente(id=paciente_id)
+    db.add(paciente)
+    db.commit()
+    return paciente
