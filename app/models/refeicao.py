@@ -1,15 +1,15 @@
-"""Modelos de Refeicao e ItemRefeicao (RF04, RF12).
+"""Modelos de Refeicao e ItemRefeicao (RF04, RF12, RF19).
 
 Escopo desta task: a estrutura do registro de consumo. Campos que pertencem a
 outras tasks entram por migration depois:
 
-- `tipo` (cafe da manha, almoco, jantar, lanche) -> Task 2.4 (RF19)
 - estimativa da IA vs valor confirmado no item -> Task 2.7 (RF23)
 - `alimento_id` apontando para a tabela TACO -> Task 2.2 (RF02.2)
 """
 
 from datetime import datetime
 from decimal import Decimal
+from enum import StrEnum
 
 from sqlalchemy import (
     CheckConstraint,
@@ -28,6 +28,15 @@ from app.db.base import Base
 CAMPOS_NUTRICIONAIS = ("calorias_kcal", "proteinas_g", "carboidratos_g", "gorduras_g")
 
 
+class TipoRefeicao(StrEnum):
+    """Categoria da refeicao (RF19), usada para organizar e filtrar o historico."""
+
+    CAFE_DA_MANHA = "cafe_da_manha"
+    ALMOCO = "almoco"
+    LANCHE = "lanche"
+    JANTAR = "jantar"
+
+
 def somar(itens: "list[ItemRefeicao]", campo: str) -> Decimal:
     """Soma um campo nutricional de uma lista de itens."""
     return sum((getattr(item, campo) for item in itens), Decimal("0"))
@@ -37,7 +46,10 @@ class Refeicao(Base):
     """Uma refeicao registrada por um paciente, com seus itens."""
 
     __tablename__ = "refeicoes"
-    __table_args__ = (Index("ix_refeicoes_paciente_consumida_em", "paciente_id", "consumida_em"),)
+    __table_args__ = (
+        Index("ix_refeicoes_paciente_consumida_em", "paciente_id", "consumida_em"),
+        Index("ix_refeicoes_paciente_tipo", "paciente_id", "tipo"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
@@ -46,6 +58,12 @@ class Refeicao(Base):
     )
 
     consumida_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    # Cafe da manha, almoco, lanche ou jantar (RF19). Quando nao informado na
+    # criacao, o service sugere automaticamente pelo horario de `consumida_em`
+    # (ver `sugerir_tipo` em app/services/refeicoes.py).
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+
     observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     criada_em: Mapped[datetime] = mapped_column(

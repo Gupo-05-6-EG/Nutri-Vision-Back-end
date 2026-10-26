@@ -141,6 +141,7 @@ do usuário: `pacientes` (triagem, teto calórico) e `nutricionistas`.
 | `id` | int | PK |
 | `paciente_id` | int | FK → `pacientes.id`, `ON DELETE CASCADE`; indexado |
 | `consumida_em` | timestamptz | quando a refeição foi consumida (gravado em UTC) |
+| `tipo` | varchar(20) | `cafe_da_manha` \| `almoco` \| `lanche` \| `jantar` (RF19) |
 | `observacao` | varchar(500) | opcional |
 | `criada_em` / `atualizada_em` | timestamptz | auditoria |
 
@@ -162,6 +163,13 @@ somados a partir dos itens na hora da leitura — uma soma gravada no banco
 divergiria dos itens na primeira edição.
 
 Índice `(paciente_id, consumida_em)` sustenta o histórico e o consumo diário.
+Índice `(paciente_id, tipo)` sustenta o filtro por tipo (RF19).
+
+**Categorização automática (RF19).** Se `tipo` não vier no `POST`, o service
+sugere um valor a partir da hora de `consumida_em`: `cafe_da_manha` (05h–11h),
+`almoco` (11h–15h), `jantar` (18h–22h); qualquer outro horário cai em `lanche`,
+que funciona como categoria coringa. O cliente pode sempre informar `tipo`
+explicitamente para sobrepor a sugestão.
 
 ### `pacientes` — triagem e teto calórico diário inicial
 
@@ -195,6 +203,30 @@ NEPA/UNICAMP) — veja [Populando a TACO](#populando-a-taco). O `alimento_id` em
 `itens_refeicao` (ligando um item da refeição a um alimento desta tabela) entra
 numa task futura, quando o front passar a montar refeições a partir da busca.
 
+### `alimento_personalizado` — alimentos criados pelo paciente (RF22)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | indexado; a FK para `usuarios` entra na Task 1.2 |
+| `nome` | varchar(150) | indexado; único por paciente (`uq_alimento_personalizado_paciente_nome`) |
+| `kcal_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `carbs_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `prot_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `gord_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `criado_em` | timestamptz | auditoria |
+
+Mesmo formato por 100g da `alimento_taco`. Na API, `kcal_100g` vai até 900, cada macro
+até 100 e carboidratos + proteínas + gorduras até 100 (g por 100g de alimento).
+
+**Busca unificada.** `GET /api/v1/alimentos?nome=` devolve, numa lista só e em ordem
+alfabética, alimentos da TACO e os personalizados do `paciente_id` informado. Sem
+`paciente_id` só vem TACO: um alimento personalizado nunca aparece para outro paciente.
+Cada item traz `origem` (`taco` \| `personalizado`) e `categoria` (`"Personalizado"` nos
+personalizados); como os ids se repetem entre as duas tabelas, o alimento é identificado
+por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) → `409`.
+`GET /api/v1/alimentos-taco` continua buscando só na TACO.
+
 ## Endpoints
 
 | Método | Rota | Descrição |
@@ -205,14 +237,17 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 | POST | `/api/v1/auth/cadastro/nutricionista` | Cadastra nutricionista e devolve o token (RF13) |
 | POST | `/api/v1/auth/login` | Login com email e senha (RF13) |
 | GET | `/api/v1/auth/me` | Usuário do token (🔒 Bearer) |
-| POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04) |
-| GET | `/api/v1/refeicoes?paciente_id=&data=` | Histórico, opcionalmente de um dia (RF12) |
-| GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=` | Consumo do dia com os totais (RF12) |
+| POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
+| GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
+| GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/{id}` | Detalhe de uma refeição |
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
+| POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
+| GET | `/api/v1/alimentos?nome=&paciente_id=` | Busca unificada: TACO + alimentos personalizados do paciente (RF22) |
+| POST | `/api/v1/calculo-nutricional` | Mapeia classes da IA para a TACO e calcula kcal/macros por porção (RF03, RF20, RF21) |
 | GET | `/docs` | Swagger UI |
 
 > **`paciente_id` por parâmetro é temporário.** O login já existe, mas refeições e
@@ -293,6 +328,25 @@ curl -X POST http://localhost:8000/api/v1/refeicoes   -H 'Content-Type: applicat
 
 curl 'http://localhost:8000/api/v1/refeicoes/consumo-diario?paciente_id=1&data=2026-09-20'
 ```
+
+### Cálculo nutricional por porção (RF03, RF20, RF21)
+
+`POST /api/v1/calculo-nutricional` recebe as classes reconhecidas pelo modelo de IA,
+o método de preparo e as gramas, e devolve a tabela nutricional da refeição (kcal,
+proteínas, carboidratos e gorduras por item e total). Não grava nada.
+
+```json
+{"itens": [{"classe": "arroz", "metodo_preparo": "cozido", "gramas": 150}]}
+```
+
+- `metodo_preparo`: `cru` \| `cozido` \| `frito`.
+- O de-para (classe + preparo → alimento da TACO) fica em
+  [`data/mapeamento_ia_taco.csv`](data/mapeamento_ia_taco.csv); para suportar uma
+  classe nova do modelo basta adicionar linhas lá (o nome precisa existir em `data/taco.csv`).
+- Fórmula: `nutriente = valor_por_100g × gramas / 100`, 2 casas (meio para cima); o total
+  soma os itens já arredondados.
+- Combinação sem mapeamento → `422`; alimento do de-para ausente em `alimento_taco`
+  (importação não rodada) → `404`.
 
 ### Cálculo basal (RF14)
 

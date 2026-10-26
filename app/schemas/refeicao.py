@@ -14,6 +14,8 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
+from app.models.refeicao import TipoRefeicao
+
 LIMITE_NUTRICIONAL = Decimal("100000")
 
 
@@ -80,12 +82,16 @@ class RefeicaoCreate(BaseModel):
     # Ainda vem no corpo; a Task 1.6 (RNF06) passa a conferir contra o token.
     paciente_id: int = Field(gt=0)
     consumida_em: datetime
+    # Cafe da manha, almoco, lanche ou jantar (RF19). Se omitido, o service
+    # sugere automaticamente a partir do horario de `consumida_em`.
+    tipo: TipoRefeicao | None = None
     observacao: str | None = Field(default=None, max_length=500)
     itens: list[ItemRefeicaoCreate] = Field(min_length=1)
 
 
 class RefeicaoUpdate(BaseModel):
     consumida_em: datetime | None = None
+    tipo: TipoRefeicao | None = None
     observacao: str | None = Field(default=None, max_length=500)
     itens: list[ItemRefeicaoCreate] | None = Field(default=None, min_length=1)
 
@@ -96,6 +102,7 @@ class RefeicaoOut(BaseModel):
     id: int
     paciente_id: int
     consumida_em: datetime
+    tipo: TipoRefeicao
     observacao: str | None
     criada_em: datetime
     atualizada_em: datetime

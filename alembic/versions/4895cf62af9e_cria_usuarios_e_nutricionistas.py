@@ -8,7 +8,7 @@ Um banco local com pacientes/refeicoes de teste sem usuario correspondente vai
 falhar aqui; recrie o banco (`docker compose down -v`) antes de subir.
 
 Revision ID: 4895cf62af9e
-Revises: 44e69f49a2c5
+Revises: 7d1e3b9a4c20
 Create Date: 2026-09-28 19:31:28.939064
 
 """
@@ -19,7 +19,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "4895cf62af9e"
-down_revision: str | None = "44e69f49a2c5"
+down_revision: str | None = "7d1e3b9a4c20"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
