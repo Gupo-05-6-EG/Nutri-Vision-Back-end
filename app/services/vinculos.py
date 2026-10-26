@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.security import Perfil, UsuarioAutenticado
+from app.models.usuario import Perfil, Usuario
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
 
 
@@ -66,7 +66,7 @@ def _gerar_codigo() -> str:
     return f"{randbelow(1_000_000):06d}"
 
 
-def gerar_codigo_vinculacao(db: Session, usuario: UsuarioAutenticado) -> CodigoVinculacao:
+def gerar_codigo_vinculacao(db: Session, usuario: Usuario) -> CodigoVinculacao:
     if usuario.perfil != Perfil.NUTRICIONISTA:
         raise PerfilIncompativel
 
@@ -97,7 +97,8 @@ def gerar_codigo_vinculacao(db: Session, usuario: UsuarioAutenticado) -> CodigoV
         registro = CodigoVinculacao(
             nutricionista_id=usuario.id,
             nutricionista_nome=usuario.nome,
-            nutricionista_foto_url=usuario.foto_url,
+            # `usuarios` ainda nao tem foto; a coluna ja existe para quando tiver.
+            nutricionista_foto_url=None,
             codigo_hash=codigo_hash,
             status=StatusCodigoVinculacao.ATIVO.value,
             expira_em=_expiracao_padrao(),
@@ -127,9 +128,7 @@ def _buscar_codigo_ativo(db: Session, codigo: str) -> CodigoVinculacao | None:
     return db.execute(stmt).scalar_one_or_none()
 
 
-def resgatar_codigo_vinculacao(
-    db: Session, usuario: UsuarioAutenticado, codigo: str
-) -> VinculoResgatado:
+def resgatar_codigo_vinculacao(db: Session, usuario: Usuario, codigo: str) -> VinculoResgatado:
     if usuario.perfil != Perfil.PACIENTE:
         raise PerfilIncompativel
 

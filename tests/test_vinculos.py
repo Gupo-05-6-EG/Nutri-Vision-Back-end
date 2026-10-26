@@ -12,42 +12,59 @@ from sqlalchemy.orm import Session, sessionmaker
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from app.core.config import get_settings
-from app.core.security import Perfil, UsuarioAutenticado, create_access_token
+from app.core.security import criar_token_acesso
+from app.models.paciente import Paciente
+from app.models.usuario import Nutricionista, Usuario
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
 from app.services.vinculos import (
     CodigoVinculacaoJaUtilizado,
     _hash_codigo,
     resgatar_codigo_vinculacao,
 )
+from tests import factories
 
 ROTA_CODIGO = "/api/v1/linking-code"
 ROTA_VINCULO = "/api/v1/link"
 
 
-def _headers(
-    usuario_id: int, perfil: str, nome: str, foto_url: str | None = None
-) -> dict[str, str]:
-    token = create_access_token(
-        {"sub": usuario_id, "perfil": perfil, "nome": nome, "foto_url": foto_url},
-        expires_delta=timedelta(minutes=30),
-    )
+# Usuarios fixos dos testes: 10 e nutricionista, 11 e 12 sao pacientes.
+NUTRI, JOAO, MARIA = 10, 11, 12
+
+
+def _criar_usuarios(db: Session) -> None:
+    factories.criar_nutricionista(db, NUTRI, nome="Dra. Ana")
+    factories.criar_paciente(db, JOAO)
+    factories.criar_paciente(db, MARIA)
+
+
+@pytest.fixture
+def usuarios(db: Session) -> None:
+    _criar_usuarios(db)
+
+
+def _headers(usuario_id: int, perfil: str) -> dict[str, str]:
+    token, _ = criar_token_acesso(usuario_id, perfil)
+    return {"Authorization": f"Bearer {token}"}
+
+
+def _token_com(payload: dict, segredo: str | None = None) -> dict[str, str]:
+    settings = get_settings()
+    token = jwt.encode(payload, segredo or settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return {"Authorization": f"Bearer {token}"}
 
 
 def _gerar_codigo(client: TestClient) -> str:
-    resposta = client.post(
-        ROTA_CODIGO,
-        headers=_headers(10, "nutricionista", "Dra. Ana", "https://img.example/ana.png"),
-    )
+    resposta = client.post(ROTA_CODIGO, headers=_headers(NUTRI, "nutricionista"))
     assert resposta.status_code == 200, resposta.text
     return resposta.json()["codigo"]
 
 
+@pytest.mark.usefixtures("usuarios")
 class TestGeracaoCodigo:
     def test_nutricionista_consegue_gerar_codigo(self, client: TestClient) -> None:
         resposta = client.post(
             ROTA_CODIGO,
-            headers=_headers(10, "nutricionista", "Dra. Ana", "https://img.example/ana.png"),
+            headers=_headers(NUTRI, "nutricionista"),
         )
 
         assert resposta.status_code == 200, resposta.text
@@ -57,7 +74,7 @@ class TestGeracaoCodigo:
         assert corpo["status"] == "ativo"
 
     def test_paciente_nao_consegue_gerar_codigo(self, client: TestClient) -> None:
-        resposta = client.post(ROTA_CODIGO, headers=_headers(11, "paciente", "Joao"))
+        resposta = client.post(ROTA_CODIGO, headers=_headers(JOAO, "paciente"))
 
         assert resposta.status_code == 403
 
@@ -68,6 +85,7 @@ class TestGeracaoCodigo:
         assert len(codigo) == 6
 
 
+@pytest.mark.usefixtures("usuarios")
 class TestResgateCodigo:
     def test_paciente_consegue_resgatar_codigo_valido(
         self, client: TestClient, db: Session
@@ -77,13 +95,14 @@ class TestResgateCodigo:
         resposta = client.post(
             ROTA_VINCULO,
             json={"codigo": codigo},
-            headers=_headers(11, "paciente", "Joao"),
+            headers=_headers(JOAO, "paciente"),
         )
 
         assert resposta.status_code == 200, resposta.text
         corpo = resposta.json()
         assert corpo["nutricionista"]["nome"] == "Dra. Ana"
-        assert corpo["nutricionista"]["foto_url"] == "https://img.example/ana.png"
+        assert corpo["nutricionista"]["id"] == NUTRI
+        assert corpo["nutricionista"]["foto_url"] is None
 
         db.expire_all()
         assert db.query(Vinculo).count() == 1
@@ -92,7 +111,7 @@ class TestResgateCodigo:
         resposta = client.post(
             ROTA_VINCULO,
             json={"codigo": "123456"},
-            headers=_headers(11, "paciente", "Joao"),
+            headers=_headers(JOAO, "paciente"),
         )
 
         assert resposta.status_code == 404
@@ -114,7 +133,7 @@ class TestResgateCodigo:
         resposta = client.post(
             ROTA_VINCULO,
             json={"codigo": codigo},
-            headers=_headers(11, "paciente", "Joao"),
+            headers=_headers(JOAO, "paciente"),
         )
 
         assert resposta.status_code == 410
@@ -124,14 +143,14 @@ class TestResgateCodigo:
         resposta_1 = client.post(
             ROTA_VINCULO,
             json={"codigo": codigo},
-            headers=_headers(11, "paciente", "Joao"),
+            headers=_headers(JOAO, "paciente"),
         )
         assert resposta_1.status_code == 200
 
         resposta_2 = client.post(
             ROTA_VINCULO,
             json={"codigo": codigo},
-            headers=_headers(12, "paciente", "Maria"),
+            headers=_headers(MARIA, "paciente"),
         )
 
         assert resposta_2.status_code == 409
@@ -144,31 +163,7 @@ class TestResgateCodigo:
         resposta = client.post(
             ROTA_VINCULO,
             json={"codigo": codigo},
-            headers=_headers(10, "nutricionista", "Dra. Ana", "https://img.example/ana.png"),
-        )
-
-        assert resposta.status_code == 403
-
-    def test_paciente_nao_pode_utilizar_o_proprio_codigo(
-        self, client: TestClient, db: Session
-    ) -> None:
-        codigo = "222222"
-        db.add(
-            CodigoVinculacao(
-                nutricionista_id=11,
-                nutricionista_nome="Joao",
-                nutricionista_foto_url=None,
-                codigo_hash=_hash_codigo(codigo),
-                status=StatusCodigoVinculacao.ATIVO.value,
-                expira_em=datetime.now(UTC) + timedelta(minutes=30),
-            )
-        )
-        db.commit()
-
-        resposta = client.post(
-            ROTA_VINCULO,
-            json={"codigo": codigo},
-            headers=_headers(11, "paciente", "Joao"),
+            headers=_headers(NUTRI, "nutricionista"),
         )
 
         assert resposta.status_code == 403
@@ -180,7 +175,7 @@ class TestResgateCodigo:
         resposta_1 = client.post(
             ROTA_VINCULO,
             json={"codigo": codigo_1},
-            headers=_headers(11, "paciente", "Joao"),
+            headers=_headers(JOAO, "paciente"),
         )
         assert resposta_1.status_code == 200
 
@@ -188,7 +183,7 @@ class TestResgateCodigo:
         resposta_2 = client.post(
             ROTA_VINCULO,
             json={"codigo": codigo_2},
-            headers=_headers(11, "paciente", "Joao"),
+            headers=_headers(JOAO, "paciente"),
         )
 
         assert resposta_2.status_code == 200
@@ -205,7 +200,7 @@ class TestResgateCodigo:
         resposta = client.post(
             ROTA_VINCULO,
             json={"codigo": codigo},
-            headers=_headers(11, "paciente", "Joao"),
+            headers=_headers(JOAO, "paciente"),
         )
 
         assert resposta.status_code == 200
@@ -214,6 +209,10 @@ class TestResgateCodigo:
         assert "token" not in corpo
         assert "senha" not in resposta.text.lower()
 
+
+# Sem a fixture `usuarios`: este teste usa sessoes proprias do engine e commita
+# de verdade, entao cria e apaga os proprios dados.
+class TestConcorrencia:
     def test_duas_tentativas_simultaneas_nao_criam_vinculos_inconsistentes(
         self, engine, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -229,6 +228,7 @@ class TestResgateCodigo:
         SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 
         sessao_inicial = SessionLocal()
+        _criar_usuarios(sessao_inicial)
         sessao_inicial.add(
             CodigoVinculacao(
                 nutricionista_id=10,
@@ -255,7 +255,7 @@ class TestResgateCodigo:
 
             resultado_a = resgatar_codigo_vinculacao(
                 sessao_a,
-                UsuarioAutenticado(id=11, perfil=Perfil.PACIENTE, nome="Joao"),
+                sessao_a.get(Usuario, JOAO),
                 codigo,
             )
             assert resultado_a.nutricionista_id == 10
@@ -268,7 +268,7 @@ class TestResgateCodigo:
             with pytest.raises(CodigoVinculacaoJaUtilizado):
                 resgatar_codigo_vinculacao(
                     sessao_b,
-                    UsuarioAutenticado(id=12, perfil=Perfil.PACIENTE, nome="Maria"),
+                    sessao_b.get(Usuario, MARIA),
                     codigo,
                 )
 
@@ -290,10 +290,15 @@ class TestResgateCodigo:
             limpeza.query(CodigoVinculacao).filter(
                 CodigoVinculacao.codigo_hash == _hash_codigo(codigo)
             ).delete()
+            ids = [NUTRI, JOAO, MARIA]
+            limpeza.query(Paciente).filter(Paciente.id.in_(ids)).delete()
+            limpeza.query(Nutricionista).filter(Nutricionista.id.in_(ids)).delete()
+            limpeza.query(Usuario).filter(Usuario.id.in_(ids)).delete()
             limpeza.commit()
             limpeza.close()
 
 
+@pytest.mark.usefixtures("usuarios")
 class TestValidacaoJWT:
     def test_requisicao_sem_token_retorna_401(self, client: TestClient) -> None:
         resposta = client.post(ROTA_CODIGO)
@@ -306,76 +311,44 @@ class TestValidacaoJWT:
         assert resposta.headers["www-authenticate"] == "Bearer"
 
     def test_token_com_assinatura_invalida_retorna_401(self, client: TestClient) -> None:
-        forjado = jwt.encode(
-            {"sub": "10", "perfil": "nutricionista", "exp": datetime.now(UTC) + timedelta(days=1)},
-            "chave-invalida",
-            algorithm="HS256",
+        headers = _token_com(
+            {"sub": str(NUTRI), "exp": datetime.now(UTC) + timedelta(days=1)},
+            segredo="chave-invalida",
         )
-        resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {forjado}"})
+        resposta = client.post(ROTA_CODIGO, headers=headers)
         assert resposta.status_code == 401
 
     def test_token_expirado_retorna_401(self, client: TestClient) -> None:
-        expirado = create_access_token(
-            {"sub": 10, "perfil": "nutricionista", "nome": "Dra. Ana"},
-            expires_delta=timedelta(minutes=-5),
-        )
-        resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {expirado}"})
+        headers = _token_com({"sub": str(NUTRI), "exp": datetime.now(UTC) - timedelta(minutes=5)})
+        resposta = client.post(ROTA_CODIGO, headers=headers)
         assert resposta.status_code == 401
 
     def test_token_sem_sub_retorna_401(self, client: TestClient) -> None:
-        settings = get_settings()
-        sem_sub = jwt.encode(
-            {
-                "perfil": "nutricionista",
-                "nome": "Dra. Ana",
-                "exp": datetime.now(UTC) + timedelta(hours=1),
-            },
-            settings.SECRET_KEY,
-            algorithm=settings.ALGORITHM,
-        )
-        resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {sem_sub}"})
+        headers = _token_com({"exp": datetime.now(UTC) + timedelta(hours=1)})
+        resposta = client.post(ROTA_CODIGO, headers=headers)
         assert resposta.status_code == 401
 
     def test_token_com_sub_nao_numerico_retorna_401(self, client: TestClient) -> None:
-        sub_invalido = create_access_token(
-            {"sub": "nao-e-numero", "perfil": "nutricionista", "nome": "Dra. Ana"},
-            expires_delta=timedelta(hours=1),
-        )
-        resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {sub_invalido}"})
+        headers = _token_com({"sub": "nao-e-numero", "exp": datetime.now(UTC) + timedelta(hours=1)})
+        resposta = client.post(ROTA_CODIGO, headers=headers)
         assert resposta.status_code == 401
 
-    def test_token_sem_perfil_retorna_401(self, client: TestClient) -> None:
-        settings = get_settings()
-        sem_perfil = jwt.encode(
-            {"sub": "10", "nome": "Dra. Ana", "exp": datetime.now(UTC) + timedelta(hours=1)},
-            settings.SECRET_KEY,
-            algorithm=settings.ALGORITHM,
-        )
-        resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {sem_perfil}"})
+    def test_token_de_usuario_inexistente_retorna_401(self, client: TestClient) -> None:
+        resposta = client.post(ROTA_CODIGO, headers=_headers(999, "nutricionista"))
         assert resposta.status_code == 401
 
-    def test_token_com_perfil_desconhecido_retorna_401(self, client: TestClient) -> None:
-        perfil_estranho = create_access_token(
-            {"sub": 10, "perfil": "administrador", "nome": "Admin"},
-            expires_delta=timedelta(hours=1),
-        )
-        resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {perfil_estranho}"})
-        assert resposta.status_code == 401
+    def test_perfil_vem_do_banco_e_nao_do_token(self, client: TestClient) -> None:
+        """Um paciente com `perfil` adulterado no token continua sendo paciente."""
+        resposta = client.post(ROTA_CODIGO, headers=_headers(JOAO, "nutricionista"))
+        assert resposta.status_code == 403
 
-    def test_token_sem_nome_utiliza_nome_padrao(self, client: TestClient) -> None:
-        """Tokens emitidos pelo login/cadastro da Task 1.2 (sem nome) sao aceitos."""
-        settings = get_settings()
-        token_sem_nome = jwt.encode(
-            {
-                "sub": "10",
-                "perfil": "nutricionista",
-                "exp": datetime.now(UTC) + timedelta(hours=1),
-            },
-            settings.SECRET_KEY,
-            algorithm=settings.ALGORITHM,
+    def test_nome_do_nutricionista_vem_do_cadastro(self, client: TestClient) -> None:
+        codigo = _gerar_codigo(client)
+        resposta = client.post(
+            ROTA_VINCULO, json={"codigo": codigo}, headers=_headers(JOAO, "paciente")
         )
-        resposta = client.post(ROTA_CODIGO, headers={"Authorization": f"Bearer {token_sem_nome}"})
         assert resposta.status_code == 200
+        assert resposta.json()["nutricionista"]["nome"] == "Dra. Ana"
 
 
 class TestIntegridadeReferencial:
@@ -396,4 +369,4 @@ class TestMigrationAlembic:
         script = ScriptDirectory.from_config(config)
         heads = script.get_heads()
         assert len(heads) == 1, f"Esperava head unica, mas foram encontradas: {heads}"
-        assert heads[0] == "a1b2c3d4e5f6"
+        assert heads[0] == "9c2f8f2d7d1a"

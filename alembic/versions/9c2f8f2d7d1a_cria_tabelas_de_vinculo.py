@@ -3,7 +3,7 @@
 Task 1.4 [Back] - Mecanismo de Vinculacao (RF15).
 
 Revision ID: 9c2f8f2d7d1a
-Revises: e4cfca49122c
+Revises: 4895cf62af9e
 Create Date: 2026-10-05 09:00:00.000000
 
 """
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "9c2f8f2d7d1a"
-down_revision: str | None = "e4cfca49122c"
+down_revision: str | None = "4895cf62af9e"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -37,6 +37,18 @@ def upgrade() -> None:
         sa.Column("expira_em", sa.DateTime(timezone=True), nullable=False),
         sa.Column("resgatado_em", sa.DateTime(timezone=True), nullable=True),
         sa.Column("paciente_id", sa.Integer(), nullable=True),
+        sa.ForeignKeyConstraint(
+            ["nutricionista_id"],
+            ["nutricionistas.id"],
+            name=op.f("fk_codigo_vinculacao_nutricionista_id_nutricionistas"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["paciente_id"],
+            ["pacientes.id"],
+            name=op.f("fk_codigo_vinculacao_paciente_id_pacientes"),
+            ondelete="SET NULL",
+        ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_codigo_vinculacao")),
         sa.UniqueConstraint("codigo_hash", name=op.f("uq_codigo_vinculacao_codigo_hash")),
     )
@@ -67,6 +79,18 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "nutricionista_id <> paciente_id",
             name=op.f("ck_vinculos_nutricionista_diferente_do_paciente"),
+        ),
+        sa.ForeignKeyConstraint(
+            ["nutricionista_id"],
+            ["nutricionistas.id"],
+            name=op.f("fk_vinculos_nutricionista_id_nutricionistas"),
+            ondelete="CASCADE",
+        ),
+        sa.ForeignKeyConstraint(
+            ["paciente_id"],
+            ["pacientes.id"],
+            name=op.f("fk_vinculos_paciente_id_pacientes"),
+            ondelete="CASCADE",
         ),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_vinculos")),
         sa.UniqueConstraint(
