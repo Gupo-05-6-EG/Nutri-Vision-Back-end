@@ -4,8 +4,9 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.core.security import Perfil, UsuarioAutenticado, require_perfil
+from app.api.deps import exigir_perfil
 from app.db.deps import DbSession
+from app.models.usuario import Perfil, Usuario
 from app.schemas.vinculo import (
     CodigoVinculacaoCreateOut,
     CodigoVinculacaoIn,
@@ -15,10 +16,8 @@ from app.services import vinculos as servico
 
 router = APIRouter(tags=["vinculos"])
 
-NutricionistaAutenticado = Annotated[
-    UsuarioAutenticado, Depends(require_perfil(Perfil.NUTRICIONISTA))
-]
-PacienteAutenticado = Annotated[UsuarioAutenticado, Depends(require_perfil(Perfil.PACIENTE))]
+NutricionistaAutenticado = Annotated[Usuario, Depends(exigir_perfil(Perfil.NUTRICIONISTA))]
+PacienteAutenticado = Annotated[Usuario, Depends(exigir_perfil(Perfil.PACIENTE))]
 
 
 @router.post(

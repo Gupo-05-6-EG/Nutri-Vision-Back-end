@@ -1,18 +1,25 @@
-"""merge task 1.4 heads and add foreign keys
+"""cria usuarios e nutricionistas
 
-Revision ID: a1b2c3d4e5f6
-Revises: cb009bd17cf9, 9c2f8f2d7d1a
-Create Date: 2026-10-05 12:00:00.000000
+Task 1.2 [Back] - API de Cadastro/Login (RF13).
+
+Tambem adiciona as FKs que ficaram pendentes nas tasks anteriores:
+`pacientes.id -> usuarios.id` e `refeicoes.paciente_id -> pacientes.id`.
+Um banco local com pacientes/refeicoes de teste sem usuario correspondente vai
+falhar aqui; recrie o banco (`docker compose down -v`) antes de subir.
+
+Revision ID: 4895cf62af9e
+Revises: 7d1e3b9a4c20
+Create Date: 2026-09-28 19:31:28.939064
 
 """
 
 from collections.abc import Sequence
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
-revision: str = "a1b2c3d4e5f6"
-down_revision: tuple[str, str] | None = ("cb009bd17cf9", "9c2f8f2d7d1a")
+revision: str = "4895cf62af9e"
+down_revision: str | None = "7d1e3b9a4c20"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
@@ -37,6 +44,7 @@ def upgrade() -> None:
 
     op.create_table(
         "nutricionistas",
+        # Sem autoincrement: o id e o do usuario.
         sa.Column("id", sa.Integer(), autoincrement=False, nullable=False),
         sa.Column("crn", sa.String(length=20), nullable=False),
         sa.ForeignKeyConstraint(
@@ -49,32 +57,18 @@ def upgrade() -> None:
         sa.UniqueConstraint("crn", name=op.f("uq_nutricionistas_crn")),
     )
 
-    with op.batch_alter_table("codigo_vinculacao") as batch_op:
+    with op.batch_alter_table("pacientes") as batch_op:
         batch_op.create_foreign_key(
-            batch_op.f("fk_codigo_vinculacao_nutricionista_id_nutricionistas"),
-            "nutricionistas",
-            ["nutricionista_id"],
+            batch_op.f("fk_pacientes_id_usuarios"),
+            "usuarios",
+            ["id"],
             ["id"],
             ondelete="CASCADE",
-        )
-        batch_op.create_foreign_key(
-            batch_op.f("fk_codigo_vinculacao_paciente_id_pacientes"),
-            "pacientes",
-            ["paciente_id"],
-            ["id"],
-            ondelete="SET NULL",
         )
 
-    with op.batch_alter_table("vinculos") as batch_op:
+    with op.batch_alter_table("refeicoes") as batch_op:
         batch_op.create_foreign_key(
-            batch_op.f("fk_vinculos_nutricionista_id_nutricionistas"),
-            "nutricionistas",
-            ["nutricionista_id"],
-            ["id"],
-            ondelete="CASCADE",
-        )
-        batch_op.create_foreign_key(
-            batch_op.f("fk_vinculos_paciente_id_pacientes"),
+            batch_op.f("fk_refeicoes_paciente_id_pacientes"),
             "pacientes",
             ["paciente_id"],
             ["id"],
@@ -83,24 +77,13 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    with op.batch_alter_table("vinculos") as batch_op:
+    with op.batch_alter_table("refeicoes") as batch_op:
         batch_op.drop_constraint(
-            batch_op.f("fk_vinculos_paciente_id_pacientes"), type_="foreignkey"
-        )
-        batch_op.drop_constraint(
-            batch_op.f("fk_vinculos_nutricionista_id_nutricionistas"),
-            type_="foreignkey",
+            batch_op.f("fk_refeicoes_paciente_id_pacientes"), type_="foreignkey"
         )
 
-    with op.batch_alter_table("codigo_vinculacao") as batch_op:
-        batch_op.drop_constraint(
-            batch_op.f("fk_codigo_vinculacao_paciente_id_pacientes"),
-            type_="foreignkey",
-        )
-        batch_op.drop_constraint(
-            batch_op.f("fk_codigo_vinculacao_nutricionista_id_nutricionistas"),
-            type_="foreignkey",
-        )
+    with op.batch_alter_table("pacientes") as batch_op:
+        batch_op.drop_constraint(batch_op.f("fk_pacientes_id_usuarios"), type_="foreignkey")
 
     op.drop_table("nutricionistas")
     op.drop_table("usuarios")

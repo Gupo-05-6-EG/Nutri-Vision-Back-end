@@ -22,10 +22,12 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+psycopg://nutrivision:nutrivision@localhost:5432/nutrivision"
     TEST_DATABASE_URL: str = "sqlite+pysqlite:///:memory:"
 
-    # Seguranca (usado a partir da Task 1.2)
-    SECRET_KEY: str = "troque-esta-chave-em-producao-com-mais-de-32-bytes"
+    # Seguranca / JWT (Task 1.2)
+    SECRET_KEY: str = "troque-esta-chave-em-producao"
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 dias
+
+    # Vinculacao paciente-nutricionista (Task 1.4)
     LINKING_CODE_EXPIRE_MINUTES: int = 60 * 24
 
     # CORS

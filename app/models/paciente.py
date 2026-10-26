@@ -2,9 +2,10 @@
 
 Escopo desta task: os dados da triagem (usados no calculo basal) e o teto
 calorico diario gerado a partir deles. Campos do DER que pertencem a outras
-tasks (`streak`, `xp`, `meta_dias`, `treino`, ...) entram por migration depois:
+tasks (`streak`, `xp`, `meta_dias`, `treino`, ...) entram por migration depois.
 
-- FK de `id` para a tabela de usuarios -> Task 1.2 (RF13)
+O paciente nasce no cadastro (Task 1.2, RF13) com o mesmo id do usuario; a
+triagem so preenche os campos abaixo.
 
 `meta_kcal` guarda o teto calorico diario vigente e `origem_meta` diz de onde ele
 veio (hoje so `harris_benedict`), como previsto no DER.
@@ -14,7 +15,7 @@ from datetime import date
 from decimal import Decimal
 from enum import StrEnum
 
-from sqlalchemy import CheckConstraint, Date, Integer, Numeric, String
+from sqlalchemy import CheckConstraint, Date, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -50,11 +51,12 @@ class Paciente(Base):
         CheckConstraint("xp >= 0", name="xp_nao_negativo"),
     )
 
-    # Sem autoincrement: o id do paciente e o id do usuario (Task 1.2 adiciona a
-    # FK para a tabela de usuarios por migration).
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    # Sem autoincrement: o id do paciente e o id do usuario.
+    id: Mapped[int] = mapped_column(
+        ForeignKey("usuarios.id", ondelete="CASCADE"), primary_key=True, autoincrement=False
+    )
 
-    # Tudo opcional porque o cadastro (Task 1.2) cria o paciente antes da triagem.
+    # Tudo opcional porque o cadastro cria o paciente antes da triagem.
     peso_kg: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     altura_cm: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     idade: Mapped[int | None] = mapped_column(Integer, nullable=True)

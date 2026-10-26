@@ -7,6 +7,7 @@ API REST do Nutri Vision, em **FastAPI + SQLAlchemy + PostgreSQL**.
 | Camada | Tecnologia |
 |---|---|
 | Linguagem | Python 3.12 |
+| Autenticação | JWT (PyJWT) + bcrypt |
 | Framework web | FastAPI |
 | ORM | SQLAlchemy 2.0 |
 | Migrations | Alembic |
@@ -20,11 +21,14 @@ API REST do Nutri Vision, em **FastAPI + SQLAlchemy + PostgreSQL**.
 ```
 app/
 ├── main.py            # create_app(): CORS, rotas, OpenAPI
-├── core/config.py     # Settings (pydantic-settings, lê o .env)
+├── core/
+│   ├── config.py      # Settings (pydantic-settings, lê o .env)
+│   └── security.py    # hash de senha (bcrypt) e JWT
 ├── db/
 │   ├── base.py        # Base declarativa + convenção de nomes
 │   └── session.py     # engine, SessionLocal, get_db()
 ├── api/
+│   ├── deps.py        # UsuarioAtual (usuário do token)
 │   ├── router.py      # agregador da API v1
 │   └── routes/        # um módulo por recurso
 ├── models/            # modelos ORM (importar todos no __init__)
@@ -109,12 +113,33 @@ pull request para `main`/`develop`, com quatro jobs:
 
 ## Modelo de dados
 
+### `usuarios` — credenciais e perfil (RF13)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `nome` | varchar(120) | |
+| `email` | varchar(254) | único, sempre gravado em minúsculas |
+| `senha_hash` | varchar(60) | hash bcrypt — a senha nunca é gravada |
+| `perfil` | varchar(20) | `paciente` \| `nutricionista` |
+| `criado_em` | timestamptz | |
+
+Os dados específicos de cada perfil ficam numa tabela própria com **o mesmo id**
+do usuário: `pacientes` (triagem, teto calórico) e `nutricionistas`.
+
+### `nutricionistas`
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK e FK → `usuarios.id`, `ON DELETE CASCADE` |
+| `crn` | varchar(20) | único; normalizado em maiúsculas (ex.: `CRN-3 12345`) |
+
 ### `refeicoes` — uma refeição registrada por um paciente
 
 | Coluna | Tipo | Observação |
 |---|---|---|
 | `id` | int | PK |
-| `paciente_id` | int | indexado; a FK para `usuarios` entra na Task 1.2 |
+| `paciente_id` | int | FK → `pacientes.id`, `ON DELETE CASCADE`; indexado |
 | `consumida_em` | timestamptz | quando a refeição foi consumida (gravado em UTC) |
 | `tipo` | varchar(20) | `cafe_da_manha` \| `almoco` \| `lanche` \| `jantar` (RF19) |
 | `observacao` | varchar(500) | opcional |
@@ -150,7 +175,7 @@ explicitamente para sobrepor a sugestão.
 
 | Coluna | Tipo | Observação |
 |---|---|---|
-| `id` | int | PK, **sem autoincrement**: é o id do usuário (a FK para `usuarios` entra na Task 1.2) |
+| `id` | int | PK e FK → `usuarios.id` (`ON DELETE CASCADE`), **sem autoincrement**: é o id do usuário |
 | `peso_kg` | numeric(5,2) | opcional; `> 0` |
 | `altura_cm` | numeric(5,2) | opcional; `> 0` |
 | `idade` | int | opcional; `> 0` |
@@ -162,7 +187,7 @@ explicitamente para sobrepor a sugestão.
 | `xp` | int | pontos acumulados; cada dia válido soma `50` |
 | `gamificacao_processada_em` | date | último dia fechado, impede crédito duplicado |
 
-As colunas são opcionais porque o cadastro (Task 1.2) cria o paciente antes da triagem.
+As colunas são opcionais porque o cadastro cria o paciente antes da triagem.
 
 `streak` e `xp` guardam, respectivamente, os dias consecutivos que cumpriram a
 regra de gamificação e os pontos acumulados. O fechamento diário considera as
@@ -201,12 +226,40 @@ NEPA/UNICAMP) — veja [Populando a TACO](#populando-a-taco). O `alimento_id` em
 `itens_refeicao` (ligando um item da refeição a um alimento desta tabela) entra
 numa task futura, quando o front passar a montar refeições a partir da busca.
 
+### `alimento_personalizado` — alimentos criados pelo paciente (RF22)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | indexado; a FK para `usuarios` entra na Task 1.2 |
+| `nome` | varchar(150) | indexado; único por paciente (`uq_alimento_personalizado_paciente_nome`) |
+| `kcal_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `carbs_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `prot_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `gord_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `criado_em` | timestamptz | auditoria |
+
+Mesmo formato por 100g da `alimento_taco`. Na API, `kcal_100g` vai até 900, cada macro
+até 100 e carboidratos + proteínas + gorduras até 100 (g por 100g de alimento).
+
+**Busca unificada.** `GET /api/v1/alimentos?nome=` devolve, numa lista só e em ordem
+alfabética, alimentos da TACO e os personalizados do `paciente_id` informado. Sem
+`paciente_id` só vem TACO: um alimento personalizado nunca aparece para outro paciente.
+Cada item traz `origem` (`taco` \| `personalizado`) e `categoria` (`"Personalizado"` nos
+personalizados); como os ids se repetem entre as duas tabelas, o alimento é identificado
+por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) → `409`.
+`GET /api/v1/alimentos-taco` continua buscando só na TACO.
+
 ## Endpoints
 
 | Método | Rota | Descrição |
 |---|---|---|
 | GET | `/api/v1/health` | Liveness |
 | GET | `/api/v1/health/db` | Readiness (consulta o banco) |
+| POST | `/api/v1/auth/cadastro/paciente` | Cadastra paciente e devolve o token (RF13) |
+| POST | `/api/v1/auth/cadastro/nutricionista` | Cadastra nutricionista e devolve o token (RF13) |
+| POST | `/api/v1/auth/login` | Login com email e senha (RF13) |
+| GET | `/api/v1/auth/me` | Usuário do token (🔒 Bearer) |
 | POST | `/api/v1/linking-code` | Gera um codigo de vinculacao de 6 digitos para o nutricionista autenticado |
 | POST | `/api/v1/link` | Resgata um codigo de vinculacao e cria o vinculo paciente-nutricionista |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
@@ -217,15 +270,85 @@ numa task futura, quando o front passar a montar refeições a partir da busca.
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
+| POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
+| GET | `/api/v1/alimentos?nome=&paciente_id=` | Busca unificada: TACO + alimentos personalizados do paciente (RF22) |
+| POST | `/api/v1/calculo-nutricional` | Mapeia classes da IA para a TACO e calcula kcal/macros por porção (RF03, RF20, RF21) |
 | GET | `/docs` | Swagger UI |
 
-> Os endpoints de vinculação usam o JWT do `Authorization: Bearer ...` para
-> identificar o perfil e o autor do código. O código é numérico, tem 6 dígitos
-> e expira após o período definido em `LINKING_CODE_EXPIRE_MINUTES`.
+> Os endpoints de vinculação exigem o token do login (`Authorization: Bearer ...`):
+> o perfil e o autor do código vêm do usuário do token. O código é numérico, tem
+> 6 dígitos e expira após o período definido em `LINKING_CODE_EXPIRE_MINUTES`.
 
-> **`paciente_id` por parâmetro é temporário.** Ainda não existe autenticação: a
-> Task 1.2 passa a tirar o paciente do token JWT e a Task 1.6 aplica o controle
-> de acesso por perfil e vínculo.
+> **`paciente_id` por parâmetro é temporário.** O login já existe, mas refeições e
+> triagem ainda não exigem token: a Task 1.6 (RNF06) passa a exigir e a validar se
+> quem chama é o próprio paciente ou um nutricionista vinculado. O `paciente_id`
+> precisa ser de um paciente cadastrado (senão `422` em refeições e `404` na triagem).
+
+### Autenticação (RF13)
+
+Cadastro e login devolvem a mesma resposta, então o app sai do cadastro já logado:
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "expira_em": "2026-10-05T19:30:00Z",
+  "usuario": {
+    "id": 1,
+    "nome": "Ana Souza",
+    "email": "ana@exemplo.com",
+    "perfil": "paciente",
+    "crn": null,
+    "criado_em": "2026-09-28T19:30:00Z"
+  }
+}
+```
+
+Nas rotas protegidas, mande o token no header `Authorization: Bearer <access_token>`.
+No Swagger (`/docs`), use o botão **Authorize** e cole só o token.
+
+| Regra | Detalhe |
+|---|---|
+| Senha | 8 caracteres no mínimo, 72 bytes no máximo (limite do bcrypt); gravada só como hash bcrypt |
+| Email | validado e normalizado para minúsculas (`Ana@X.com` e `ana@x.com` são o mesmo) |
+| Token | JWT HS256 com `sub` (id do usuário), `perfil` e `exp`; expira em **7 dias** (`ACCESS_TOKEN_EXPIRE_MINUTES`) |
+| Paciente | cadastro pede `nome`, `email`, `senha`; peso/altura/etc. vêm depois, na triagem |
+| Nutricionista | além disso exige `crn` (único) |
+
+| Situação | Resposta |
+|---|---|
+| Email ou CRN já cadastrado | `409` |
+| Email inexistente ou senha errada | `401` `"Email ou senha invalidos"` (não diz qual dos dois) |
+| Sem token, token inválido ou expirado | `401` |
+| Dados inválidos | `422` |
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/cadastro/paciente   -H 'Content-Type: application/json'   -d '{"nome": "Ana Souza", "email": "ana@exemplo.com", "senha": "senha-forte-123"}'
+
+curl -X POST http://localhost:8000/api/v1/auth/cadastro/nutricionista   -H 'Content-Type: application/json'   -d '{"nome": "Bruno Lima", "email": "bruno@exemplo.com", "senha": "senha-forte-123", "crn": "CRN-3 12345"}'
+
+curl -X POST http://localhost:8000/api/v1/auth/login   -H 'Content-Type: application/json'   -d '{"email": "ana@exemplo.com", "senha": "senha-forte-123"}'
+
+curl http://localhost:8000/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
+```
+
+Para proteger uma rota nova, basta receber o usuário do token:
+
+```python
+from app.api.deps import UsuarioAtual
+
+@router.get("/algo")
+def algo(usuario: UsuarioAtual, db: DbSession): ...
+```
+
+Para aceitar só um perfil (`403` para o outro), use `exigir_perfil`:
+
+```python
+from app.api.deps import exigir_perfil
+
+@router.post("/so-nutri")
+def so_nutri(usuario: Annotated[Usuario, Depends(exigir_perfil(Perfil.NUTRICIONISTA))]): ...
+```
 
 ### Exemplo
 
@@ -244,12 +367,31 @@ curl -X POST http://localhost:8000/api/v1/refeicoes   -H 'Content-Type: applicat
 curl 'http://localhost:8000/api/v1/refeicoes/consumo-diario?paciente_id=1&data=2026-09-20'
 ```
 
+### Cálculo nutricional por porção (RF03, RF20, RF21)
+
+`POST /api/v1/calculo-nutricional` recebe as classes reconhecidas pelo modelo de IA,
+o método de preparo e as gramas, e devolve a tabela nutricional da refeição (kcal,
+proteínas, carboidratos e gorduras por item e total). Não grava nada.
+
+```json
+{"itens": [{"classe": "arroz", "metodo_preparo": "cozido", "gramas": 150}]}
+```
+
+- `metodo_preparo`: `cru` \| `cozido` \| `frito`.
+- O de-para (classe + preparo → alimento da TACO) fica em
+  [`data/mapeamento_ia_taco.csv`](data/mapeamento_ia_taco.csv); para suportar uma
+  classe nova do modelo basta adicionar linhas lá (o nome precisa existir em `data/taco.csv`).
+- Fórmula: `nutriente = valor_por_100g × gramas / 100`, 2 casas (meio para cima); o total
+  soma os itens já arredondados.
+- Combinação sem mapeamento → `422`; alimento do de-para ausente em `alimento_taco`
+  (importação não rodada) → `404`.
+
 ### Cálculo basal (RF14)
 
 `POST /api/v1/pacientes/{paciente_id}/triagem` recebe os dados da triagem, calcula o
 **Teto Calórico Diário Inicial** e o salva em `pacientes.meta_kcal`
-(`origem_meta = "harris_benedict"`). Se o paciente ainda não existe ele é criado; se já
-existe, a triagem e o teto são sobrescritos (refazer a triagem gera um novo teto).
+(`origem_meta = "harris_benedict"`). O paciente precisa estar cadastrado
+(`404` se não estiver); refazer a triagem sobrescreve os dados e gera um novo teto.
 
 **Corpo da requisição** — todos os campos são obrigatórios:
 
@@ -303,7 +445,7 @@ Permite o vínculo entre paciente e nutricionista por meio de um código tempor�
 - `POST /api/v1/link`: Exige autenticação de paciente. Recebe `{"codigo": "123456"}` e cria o vínculo de forma atômica e idempotente.
 
 **Comportamento de erro e respostas HTTP:**
-- `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, perfil/sub ausente ou inválido, ou usuário inexistente.
+- `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, `sub` ausente ou inválido, ou usuário inexistente.
 - `403 Forbidden`: perfil incompatível (paciente tentando gerar código, nutricionista tentando resgatar, ou paciente tentando resgatar código gerado por ele mesmo).
 - `404 Not Found`: código não encontrado.
 - `409 Conflict`: código já utilizado por outro paciente.
@@ -311,7 +453,7 @@ Permite o vínculo entre paciente e nutricionista por meio de um código tempor�
 - `422 Unprocessable Entity`: formato inválido (ex.: código não numérico ou com tamanho diferente de 6 dígitos).
 
 **Migrations e Integridade Referencial:**
-A migration `a1b2c3d4e5f6` unifica os branches concorrentes do Alembic e adiciona integridade referencial com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
+A migration `9c2f8f2d7d1a` (depois da `4895cf62af9e`, que cria `usuarios` e `nutricionistas`) cria `codigo_vinculacao` e `vinculos` com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
 
 ### Valores nutricionais
 
