@@ -92,6 +92,52 @@ Fonte: planilha oficial da UNICAMP, via [raulfdm/taco-api](https://github.com/ra
 essencial em branco na própria fonte (ex.: leite integral e desnatado sem
 `kcal`/`proteína` preenchidos).
 
+## Backup e recuperação (RNF10)
+
+O serviço `backup` do `docker-compose.yml` faz o backup automático do banco e testa a
+restauração. Os scripts ficam em [`scripts/backup/`](scripts/backup/) e só usam as
+ferramentas do Postgres (`pg_dump`, `pg_restore`, `psql`).
+
+| O quê | Quando (padrão) | Onde |
+|---|---|---|
+| Backup (`pg_dump -Fc` + `sha256`) | todo dia às 03:00 (`BACKUP_CRON`) | `$BACKUP_HOST_DIR/diario/` |
+| Cópia semanal | o backup de domingo | `$BACKUP_HOST_DIR/semanal/` |
+| Teste de restauração | domingo às 03:30 (`BACKUP_TESTE_CRON`) | resultado em `$BACKUP_HOST_DIR/restauracoes.log` |
+
+**Retenção:** 7 backups diários (`BACKUP_RETENCAO_DIAS`) e 4 semanais
+(`BACKUP_RETENCAO_SEMANAS`). **Local separado:** `BACKUP_HOST_DIR` (padrão `./backups`)
+deve apontar para outro disco, um NAS ou uma pasta sincronizada com a nuvem; nunca para
+o mesmo volume do banco. Os horários seguem o `TZ` (padrão `America/Sao_Paulo`).
+
+```bash
+docker compose up -d backup                          # agenda backup e teste
+docker compose logs -f backup                        # acompanha as execuções
+docker compose exec backup sh /scripts/backup.sh     # backup na hora
+docker compose exec backup sh /scripts/testar_restauracao.sh
+```
+
+O **teste de restauração** restaura o backup mais recente num banco temporário
+(`<banco>_teste_restauracao`) e confere o checksum, a presença de todas as tabelas do
+banco em uso e a versão do Alembic. Depois registra no log as contagens por tabela e
+apaga o banco temporário. Exemplo de linha do log:
+
+```
+2026-11-01T06:30:02Z OK nutrivision_20261101_060000.dump: alimento_taco=590 pacientes=12 ...
+```
+
+**Recuperar os dados** (apaga o conteúdo atual do banco, por isso pede confirmação):
+
+```bash
+docker compose stop api
+docker compose exec -e CONFIRMAR=sim backup sh /scripts/restaurar.sh /backups/diario/<arquivo>.dump
+docker compose start api
+```
+
+Para restaurar em outro banco (ex.: investigar um dado antigo sem mexer no principal),
+passe o nome como segundo argumento: `sh /scripts/restaurar.sh <arquivo>.dump copia`.
+O CI (job *Backup e restauração*) roda backup, retenção e restauração contra um
+Postgres a cada push.
+
 ## Testes e qualidade
 
 ```bash
