@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     # Vinculacao paciente-nutricionista (Task 1.4)
     LINKING_CODE_EXPIRE_MINUTES: int = 60 * 24
 
+    # Logs (Task 7.1). LOG_JSON sem valor = JSON so em producao.
+    LOG_LEVEL: str = "INFO"
+    LOG_JSON: bool | None = None
+
     # CORS
     BACKEND_CORS_ORIGINS: list[str] = [
         "http://localhost:5173",
@@ -43,6 +47,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
+
+    @property
+    def logs_em_json(self) -> bool:
+        return self.is_production if self.LOG_JSON is None else self.LOG_JSON
 
 
 @lru_cache
