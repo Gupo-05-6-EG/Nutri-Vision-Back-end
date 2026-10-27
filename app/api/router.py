@@ -10,6 +10,7 @@ from app.api.routes import (
     gamificacao,
     health,
     pacientes,
+    privacidade,
     refeicoes,
 )
 
@@ -22,3 +23,4 @@ api_router.include_router(refeicoes.router)
 api_router.include_router(calculo_nutricional.router)
 api_router.include_router(amizades.router)
 api_router.include_router(gamificacao.router)
+api_router.include_router(privacidade.router)

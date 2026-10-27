@@ -223,6 +223,8 @@ por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) →
 | GET | `/api/v1/amizades?paciente_id=&status=` | Lista amigos e convites de um paciente (RF05) |
 | DELETE | `/api/v1/amizades/{id}?paciente_id=` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
 | GET | `/api/v1/gamificacao/leaderboard?paciente_id=&limite=` | Leaderboard: Top 10 amigos por ganho de XP na janela semanal (RF05.3, RF29) |
+| GET | `/api/v1/privacidade/ranking-publico?paciente_id=&limite=` | Ranking público LGPD: expõe estritamente nome, avatar, pontos e streak (RF29, RNF07) |
+| GET | `/api/v1/privacidade/desafios/{id}/publico?participantes=` | Desafio público LGPD: expõe estritamente nome, avatar, pontos e streak (RF05.2, RF29) |
 | POST | `/api/v1/gamificacao/xp` | Concede pontos de XP ao paciente e registra histórico (RF05, RF16) |
 | GET | `/api/v1/gamificacao/historico-xp?paciente_id=` | Histórico auditável de XP do paciente (RF16) |
 | GET | `/docs` | Swagger UI |
