@@ -38,6 +38,7 @@ services:
   backup:
     image: postgres:16-alpine
     container_name: nutrivision-backup
+    restart: unless-stopped
     environment:
       PGHOST: db
       PGUSER: ${POSTGRES_USER:-nutrivision}
