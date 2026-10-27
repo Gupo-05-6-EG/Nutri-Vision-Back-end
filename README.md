@@ -92,6 +92,41 @@ Fonte: planilha oficial da UNICAMP, via [raulfdm/taco-api](https://github.com/ra
 essencial em branco na própria fonte (ex.: leite integral e desnatado sem
 `kcal`/`proteína` preenchidos).
 
+## Produção e monitoramento (RNF09, RNF11)
+
+```bash
+cp .env.example .env    # troque SECRET_KEY, senhas e ENVIRONMENT=production
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --scale api=2
+```
+
+O [`docker-compose.prod.yml`](docker-compose.prod.yml) sobrepõe o de desenvolvimento:
+
+| Item | Como |
+|---|---|
+| Entrada única | `proxy` (nginx, [`deploy/nginx.conf`](deploy/nginx.conf)) na porta `API_PORT`; banco e API ficam só na rede interna |
+| Escala horizontal | `--scale api=N` réplicas, cada uma com `WEB_CONCURRENCY` processos; o nginx distribui entre elas |
+| Migrations | `alembic upgrade head` na subida da API |
+| Disponibilidade | `restart: unless-stopped`; o healthcheck usa `/health/db`, e réplica sem banco sai de `healthy` |
+| Segurança | imagem roda como usuário sem root (`app`) |
+| Logs | JSON (uma linha por evento) com rotação (`10m` × 5 arquivos) |
+
+**Health checks.** `GET /api/v1/health` (liveness: o processo responde) e
+`GET /api/v1/health/db` (readiness: o banco responde, senão `503`). Para monitorar o
+uptime, aponte um monitor externo (UptimeRobot, Better Stack, Uptime Kuma...) para
+`/api/v1/health/db`, com alerta por email/Telegram após 2 falhas seguidas.
+
+**Logs e rastreio.** Toda resposta traz `X-Request-ID` (o do cliente, se vier, ou um
+gerado). Esse id aparece em todas as linhas de log da requisição. Cada requisição gera
+uma linha de acesso:
+
+```json
+{"ts": "2026-10-27T00:01:05.76+00:00", "nivel": "INFO", "logger": "nutrivision.acesso", "msg": "GET /api/v1/health/db 200", "metodo": "GET", "caminho": "/api/v1/health/db", "status": 200, "duracao_ms": 1.7, "request_id": "5593f92a..."}
+```
+
+Erros não tratados saem com `nivel: ERROR` e o traceback em `erro`. Num agregador de
+logs, alertas úteis são `nivel = ERROR`, `status >= 500` e `duracao_ms` alto.
+`LOG_LEVEL` ajusta o nível, e `LOG_JSON` força o formato (padrão: JSON só em produção).
+
 ## Testes e qualidade
 
 ```bash
