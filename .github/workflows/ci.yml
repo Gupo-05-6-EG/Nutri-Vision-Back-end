@@ -104,7 +104,7 @@ jobs:
       PGUSER: nutrivision
       PGPASSWORD: nutrivision
       PGDATABASE: nutrivision
-      BACKUP_DIR: ${{ runner.temp }}/backups
+      BACKUP_DIR: /tmp/backups
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
