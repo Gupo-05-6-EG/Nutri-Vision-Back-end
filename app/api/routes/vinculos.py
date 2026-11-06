@@ -2,7 +2,7 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from app.api.deps import exigir_perfil
 from app.db.deps import DbSession
@@ -10,6 +10,8 @@ from app.models.usuario import Perfil, Usuario
 from app.schemas.vinculo import (
     CodigoVinculacaoCreateOut,
     CodigoVinculacaoIn,
+    PacienteVinculadoOut,
+    StatusVinculoOut,
     VinculoCriadoOut,
 )
 from app.services import vinculos as servico
@@ -92,5 +94,68 @@ def resgatar_codigo(
                 "foto_url": vinculo.nutricionista_foto_url,
             },
             "vinculado_em": vinculo.vinculado_em,
+            "status": vinculo.status,
         }
     )
+
+
+def _resposta_status(vinculo) -> StatusVinculoOut:
+    return StatusVinculoOut(
+        vinculo_id=vinculo.id,
+        paciente_id=vinculo.paciente_id,
+        nutricionista_id=vinculo.nutricionista_id,
+        status=vinculo.status,
+    )
+
+
+@router.post("/link/{nutricionista_id}/aceitar", response_model=StatusVinculoOut)
+def aceitar_vinculo(
+    nutricionista_id: int, db: DbSession, usuario: PacienteAutenticado
+) -> StatusVinculoOut:
+    return _responder_vinculo(db, usuario, nutricionista_id, aceitar=True)
+
+
+@router.post("/link/{nutricionista_id}/recusar", response_model=StatusVinculoOut)
+def recusar_vinculo(
+    nutricionista_id: int, db: DbSession, usuario: PacienteAutenticado
+) -> StatusVinculoOut:
+    return _responder_vinculo(db, usuario, nutricionista_id, aceitar=False)
+
+
+def _responder_vinculo(db, usuario, nutricionista_id: int, *, aceitar: bool) -> StatusVinculoOut:
+    try:
+        vinculo = servico.responder_solicitacao(db, usuario, nutricionista_id, aceitar)
+    except servico.VinculoNaoEncontrado:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Vinculo nao encontrado") from None
+    except servico.TransicaoVinculoInvalida:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Vinculo nao esta pendente") from None
+    return _resposta_status(vinculo)
+
+
+@router.get("/patients", response_model=list[PacienteVinculadoOut])
+def listar_pacientes_vinculados(
+    db: DbSession,
+    usuario: NutricionistaAutenticado,
+    busca: str | None = Query(default=None, max_length=120),
+) -> list[PacienteVinculadoOut]:
+    return [
+        PacienteVinculadoOut(
+            paciente_id=paciente.id,
+            nome=paciente.nome,
+            email=paciente.email,
+            status=vinculo.status,
+            vinculado_em=vinculo.criado_em,
+        )
+        for vinculo, paciente in servico.listar_pacientes(db, usuario, busca)
+    ]
+
+
+@router.delete("/patients/{paciente_id}", response_model=StatusVinculoOut)
+def desvincular_paciente(
+    paciente_id: int, db: DbSession, usuario: NutricionistaAutenticado
+) -> StatusVinculoOut:
+    try:
+        vinculo = servico.encerrar_vinculo(db, usuario, paciente_id)
+    except servico.VinculoNaoEncontrado:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Vinculo ativo nao encontrado") from None
+    return _resposta_status(vinculo)

@@ -10,7 +10,7 @@ from app.models.alimento_taco import AlimentoTaco
 from app.models.paciente import Genero, NivelAtividade, Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.models.usuario import Nutricionista, Perfil, Usuario
-from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
+from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, StatusVinculo, Vinculo
 
 __all__ = [
     "AlimentoPersonalizado",
@@ -25,6 +25,7 @@ __all__ = [
     "Perfil",
     "Refeicao",
     "StatusCodigoVinculacao",
+    "StatusVinculo",
     "TipoRefeicao",
     "Usuario",
     "Vinculo",

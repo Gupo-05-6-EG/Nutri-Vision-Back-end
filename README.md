@@ -261,7 +261,11 @@ por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) →
 | POST | `/api/v1/auth/login` | Login com email e senha (RF13) |
 | GET | `/api/v1/auth/me` | Usuário do token (🔒 Bearer) |
 | POST | `/api/v1/linking-code` | Gera um codigo de vinculacao de 6 digitos para o nutricionista autenticado |
-| POST | `/api/v1/link` | Resgata um codigo de vinculacao e cria o vinculo paciente-nutricionista |
+| POST | `/api/v1/link` | Paciente resgata um codigo e cria uma solicitacao pendente |
+| POST | `/api/v1/link/{nutricionista_id}/aceitar` | Paciente aceita a solicitacao de vinculo |
+| POST | `/api/v1/link/{nutricionista_id}/recusar` | Paciente recusa a solicitacao de vinculo |
+| GET | `/api/v1/patients?busca=` | Nutricionista lista pacientes ativos com busca opcional por nome |
+| DELETE | `/api/v1/patients/{paciente_id}` | Nutricionista encerra o vinculo ativo |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
 | GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
@@ -443,6 +447,8 @@ Permite o vínculo entre paciente e nutricionista por meio de um código tempor�
 
 - `POST /api/v1/linking-code`: Exige autenticação de nutricionista (`Authorization: Bearer <token>`). Gera um código numérico de 6 dígitos que expira conforme `LINKING_CODE_EXPIRE_MINUTES`.
 - `POST /api/v1/link`: Exige autenticação de paciente. Recebe `{"codigo": "123456"}` e cria o vínculo de forma atômica e idempotente.
+
+Depois de resgatar o codigo, o paciente pode chamar `POST /api/v1/link/{nutricionista_id}/aceitar` ou `/recusar`. O status fica `pendente` ate a resposta; as transicoes finais sao `ativo` ou `recusado`. A rota `GET /api/v1/patients?busca=` lista os vinculos ativos do nutricionista autenticado, e `DELETE /api/v1/patients/{paciente_id}` os encerra com status `encerrado`. Vínculos existentes antes da migration `d4e5f6a7b890` sao preservados como `ativo`.
 
 **Comportamento de erro e respostas HTTP:**
 - `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, `sub` ausente ou inválido, ou usuário inexistente.

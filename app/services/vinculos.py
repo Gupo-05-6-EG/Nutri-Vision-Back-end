@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.models.usuario import Perfil, Usuario
-from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
+from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, StatusVinculo, Vinculo
 
 
 class CodigoVinculacaoNaoEncontrado(Exception):
@@ -40,6 +40,7 @@ class VinculoResgatado:
     nutricionista_nome: str
     nutricionista_foto_url: str | None
     vinculado_em: datetime
+    status: str
 
 
 def _agora() -> datetime:
@@ -199,6 +200,9 @@ def resgatar_codigo_vinculacao(db: Session, usuario: Usuario, codigo: str) -> Vi
             vinculo = vinculo_recarregado
     else:
         vinculo = vinculo_existente
+        if vinculo.status in (StatusVinculo.RECUSADO.value, StatusVinculo.ENCERRADO.value):
+            vinculo.status = StatusVinculo.PENDENTE.value
+            vinculo.criado_em = agora
 
     try:
         db.commit()
@@ -213,4 +217,71 @@ def resgatar_codigo_vinculacao(db: Session, usuario: Usuario, codigo: str) -> Vi
         nutricionista_nome=registro.nutricionista_nome,
         nutricionista_foto_url=registro.nutricionista_foto_url,
         vinculado_em=vinculado_em,
+        status=vinculo.status,
     )
+
+
+class VinculoNaoEncontrado(Exception):
+    pass
+
+
+class TransicaoVinculoInvalida(Exception):
+    pass
+
+
+def responder_solicitacao(
+    db: Session, paciente: Usuario, nutricionista_id: int, aceitar: bool
+) -> Vinculo:
+    if paciente.perfil != Perfil.PACIENTE:
+        raise PerfilIncompativel
+    vinculo = db.execute(
+        select(Vinculo).where(
+            Vinculo.paciente_id == paciente.id,
+            Vinculo.nutricionista_id == nutricionista_id,
+        )
+    ).scalar_one_or_none()
+    if vinculo is None:
+        raise VinculoNaoEncontrado
+    if vinculo.status != StatusVinculo.PENDENTE.value:
+        raise TransicaoVinculoInvalida
+    vinculo.status = (StatusVinculo.ATIVO if aceitar else StatusVinculo.RECUSADO).value
+    db.commit()
+    db.refresh(vinculo)
+    return vinculo
+
+
+def listar_pacientes(
+    db: Session, nutricionista: Usuario, busca: str | None = None
+) -> list[tuple[Vinculo, Usuario]]:
+    if nutricionista.perfil != Perfil.NUTRICIONISTA:
+        raise PerfilIncompativel
+    stmt = (
+        select(Vinculo, Usuario)
+        .join(Usuario, Usuario.id == Vinculo.paciente_id)
+        .where(
+            Vinculo.nutricionista_id == nutricionista.id,
+            Vinculo.status == StatusVinculo.ATIVO.value,
+        )
+        .order_by(Usuario.nome, Usuario.id)
+    )
+    if busca:
+        stmt = stmt.where(Usuario.nome.ilike(f"%{busca.strip()}%"))
+    return list(db.execute(stmt).all())
+
+
+def encerrar_vinculo(db: Session, nutricionista: Usuario, paciente_id: int) -> Vinculo:
+    if nutricionista.perfil != Perfil.NUTRICIONISTA:
+        raise PerfilIncompativel
+    vinculo = db.execute(
+        select(Vinculo).where(
+            Vinculo.nutricionista_id == nutricionista.id,
+            Vinculo.paciente_id == paciente_id,
+            Vinculo.status == StatusVinculo.ATIVO.value,
+        )
+    ).scalar_one_or_none()
+    if vinculo is None:
+        raise VinculoNaoEncontrado
+    vinculo.status = StatusVinculo.ENCERRADO.value
+    db.commit()
+    db.refresh(vinculo)
+    return vinculo
