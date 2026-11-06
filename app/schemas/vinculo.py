@@ -34,7 +34,27 @@ class NutricionistaPublicoOut(BaseModel):
 class VinculoCriadoOut(BaseModel):
     nutricionista: NutricionistaPublicoOut
     vinculado_em: datetime
+    status: str = "pendente"
 
     @field_serializer("vinculado_em")
     def _vinculado_em_com_fuso(self, valor: datetime) -> datetime:
         return _com_fuso(valor)
+
+
+class PacienteVinculadoOut(BaseModel):
+    paciente_id: int
+    nome: str
+    email: str
+    status: str
+    vinculado_em: datetime
+
+    @field_serializer("vinculado_em")
+    def _data_com_fuso(self, valor: datetime) -> datetime:
+        return _com_fuso(valor)
+
+
+class StatusVinculoOut(BaseModel):
+    vinculo_id: int
+    paciente_id: int
+    nutricionista_id: int
+    status: str
