@@ -41,8 +41,10 @@ PACIENTE = 1
 
 
 @pytest.fixture
-def paciente(db: Session) -> None:
+def paciente(db: Session, client: TestClient) -> None:
+    """Paciente 1 existe e as requisicoes saem autenticadas como ele (Task 1.6)."""
     factories.criar_paciente(db, PACIENTE)
+    client.headers.update(factories.headers_de(PACIENTE))
 
 
 @pytest.fixture
@@ -383,6 +385,7 @@ class TestPropriedadesCalculoBasal:
                 "genero": "feminino",
                 "nivel_atividade": nivel.value,
             },
+            headers=factories.headers_de(PACIENTE),
         )
 
         assert resposta.status_code == 200, resposta.text
@@ -399,6 +402,12 @@ class TestPropriedadesCalculoBasal:
 
 @pytest.mark.usefixtures("taco_real")
 class TestIntegracaoComTacoReal:
+    @pytest.fixture(autouse=True)
+    def _logado(self, db: Session, client: TestClient) -> None:
+        """A API exige token (Task 1.6): por padrao entra como o paciente 1."""
+        factories.criar_paciente(db, PACIENTE)
+        client.headers.update(factories.headers_de(PACIENTE))
+
     def test_tabela_completa_foi_carregada(self, db: Session) -> None:
         assert db.query(AlimentoTaco).count() > 500
 
@@ -437,6 +446,8 @@ class TestIntegracaoComTacoReal:
         cadastro = client.post("/api/v1/auth/cadastro/paciente", json=factories.cadastro())
         assert cadastro.status_code == 201
         paciente_id = cadastro.json()["usuario"]["id"]
+        # A partir daqui as chamadas saem como o paciente recem-cadastrado.
+        client.headers["Authorization"] = f"Bearer {cadastro.json()['access_token']}"
         triagem = client.post(
             f"/api/v1/pacientes/{paciente_id}/triagem",
             json={

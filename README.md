@@ -93,6 +93,38 @@ Fonte: planilha oficial da UNICAMP, via [raulfdm/taco-api](https://github.com/ra
 essencial em branco na própria fonte (ex.: leite integral e desnatado sem
 `kcal`/`proteína` preenchidos).
 
+## Segurança e controle de acesso (RNF06)
+
+**Autenticação.** Todo endpoint, exceto `/health*`, `/auth/cadastro/*` e `/auth/login`,
+exige `Authorization: Bearer <token>`. Sem token válido a resposta é `401`. O perfil
+(`paciente`/`nutricionista`) é lido do **banco**, não do token.
+
+**Autorização por perfil e vínculo** (`app/api/deps.py`). `paciente_id` continua vindo
+no caminho, na query ou no corpo, e é conferido contra o token:
+
+| Operação | Quem pode |
+|---|---|
+| Ler refeições, consumo diário e alimentos personalizados de um paciente | o próprio paciente ou o nutricionista **com vínculo** com ele |
+| Triagem, lembretes, token de push, registrar/editar/remover refeição, cadastrar alimento personalizado | só o próprio paciente |
+| Gerar código de vinculação (`/linking-code`) | só nutricionista |
+| Resgatar código (`/link`) | só paciente |
+| Busca na TACO (`/alimentos-taco`, `/alimentos` sem `paciente_id`) e `/calculo-nutricional` | qualquer usuário logado |
+
+Sem acesso a resposta é `403` — inclusive quando o paciente não existe, para a API não
+revelar quais ids existem. Ter vínculo com um paciente não dá acesso a outro.
+
+**HTTPS.** Com `HTTPS_ONLY=true` a API redireciona `http` → `https` e envia
+`Strict-Transport-Security`. Atrás de proxy que termina o TLS, o proxy deve mandar
+`X-Forwarded-Proto` e o uvicorn precisa confiar nele (`FORWARDED_ALLOW_IPS`).
+
+**Criptografia em repouso.** Senhas e códigos de vinculação são gravados só como hash.
+Os dados de saúde (`pacientes.peso_kg`, `altura_cm`, `idade`, `genero`,
+`nivel_atividade` e `refeicoes.observacao`) são gravados cifrados com Fernet usando
+`ENCRYPTION_KEY` (`app/core/crypto.py`). O ORM continua devolvendo `Decimal`/`int`/`str`;
+no banco fica texto opaco, então essas colunas não podem ser filtradas nem somadas em
+SQL. **Perder a chave = perder esses dados**, e a chave não pode ser trocada em um banco
+que já tem dados.
+
 ## Testes e qualidade
 
 ```bash
@@ -143,7 +175,7 @@ do usuário: `pacientes` (triagem, teto calórico) e `nutricionistas`.
 | `paciente_id` | int | FK → `pacientes.id`, `ON DELETE CASCADE`; indexado |
 | `consumida_em` | timestamptz | quando a refeição foi consumida (gravado em UTC) |
 | `tipo` | varchar(20) | `cafe_da_manha` \| `almoco` \| `lanche` \| `jantar` (RF19) |
-| `observacao` | varchar(500) | opcional |
+| `observacao` | text (cifrado) | opcional; até 500 caracteres (valida o schema) |
 | `criada_em` / `atualizada_em` | timestamptz | auditoria |
 
 ### `itens_refeicao` — os alimentos daquela refeição
@@ -177,11 +209,11 @@ explicitamente para sobrepor a sugestão.
 | Coluna | Tipo | Observação |
 |---|---|---|
 | `id` | int | PK e FK → `usuarios.id` (`ON DELETE CASCADE`), **sem autoincrement**: é o id do usuário |
-| `peso_kg` | numeric(5,2) | opcional; `> 0` |
-| `altura_cm` | numeric(5,2) | opcional; `> 0` |
-| `idade` | int | opcional; `> 0` |
-| `genero` | varchar(30) | `masculino` \| `feminino` |
-| `nivel_atividade` | varchar(30) | `sedentario` \| `leve` \| `moderado` \| `intenso` \| `muito_intenso` |
+| `peso_kg` | text (cifrado) | opcional; `Decimal` `> 0` (valida o schema) |
+| `altura_cm` | text (cifrado) | opcional; `Decimal` `> 0` (valida o schema) |
+| `idade` | text (cifrado) | opcional; `int` `> 0` (valida o schema) |
+| `genero` | text (cifrado) | `masculino` \| `feminino` |
+| `nivel_atividade` | text (cifrado) | `sedentario` \| `leve` \| `moderado` \| `intenso` \| `muito_intenso` |
 | `meta_kcal` | numeric(6,2) | teto calórico diário vigente; `>= 0` |
 | `origem_meta` | varchar(30) | de onde veio a meta (hoje só `harris_benedict`) |
 | `streak` | int | dias consecutivos que cumpriram a regra diária (inicia em `0`) |
@@ -320,20 +352,6 @@ personalizados); como os ids se repetem entre as duas tabelas, o alimento é ide
 por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) → `409`.
 `GET /api/v1/alimentos-taco` continua buscando só na TACO.
 
-### `planos_alimentares`, `refeicoes_plano`, `alimentos_refeicao_plano` — plano alimentar (RF09.1)
-
-Plano prescrito pelo nutricionista: blocos de refeição, cada um com metas e alimentos.
-
-| Tabela | Colunas principais |
-|---|---|
-| `planos_alimentares` | `paciente_id` (FK, `CASCADE`), `nutricionista_id` (FK, `SET NULL`), `titulo`, `observacao`, `ativo`, `criado_em` |
-| `refeicoes_plano` | `plano_id` (FK, `CASCADE`), `ordem`, `nome` (livre: "Ceia", "Lanche da tarde"...), `horario` (opcional), `meta_kcal`, `meta_proteinas_g`, `observacao` |
-| `alimentos_refeicao_plano` | `refeicao_plano_id` (FK, `CASCADE`), `ordem`, `nome_alimento`, `quantidade_g` (`> 0`), `alimento_taco_id` (FK opcional, `SET NULL`) |
-
-Cada paciente tem **um plano ativo**: prescrever outro desativa o anterior (fica no
-banco com `ativo = false`). As metas do dia (`totais`) são a soma dos blocos e não são
-gravadas. O versionamento com auditoria é da Task 5.3 (RF08).
-
 ## Endpoints
 
 | Método | Rota | Descrição |
@@ -353,8 +371,6 @@ gravadas. O versionamento com auditoria é da Task 5.3 (RF08).
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
-| POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve um plano alimentar e o torna o plano ativo (RF09.1, 🔒 nutricionista vinculado) |
-| GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (RF09.1, 🔒 o próprio paciente ou nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Lista os horários de lembrete de refeição (RF26) |
 | PUT | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Salva os horários de lembrete por refeição (RF26) |
 | PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |
@@ -543,42 +559,6 @@ Permite o vínculo entre paciente e nutricionista por meio de um código tempor�
 
 **Migrations e Integridade Referencial:**
 A migration `9c2f8f2d7d1a` (depois da `4895cf62af9e`, que cria `usuarios` e `nutricionistas`) cria `codigo_vinculacao` e `vinculos` com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
-
-### Plano alimentar (RF09.1)
-
-`POST /api/v1/pacientes/{paciente_id}/planos` (token de nutricionista com vínculo ao paciente):
-
-```json
-{
-  "titulo": "Reeducação alimentar",
-  "observacao": "Beber 2L de água por dia",
-  "refeicoes": [
-    {
-      "nome": "Café da manhã",
-      "horario": "07:30",
-      "meta_kcal": 400,
-      "meta_proteinas_g": 20,
-      "alimentos": [
-        { "nome_alimento": "Pão integral", "quantidade_g": 50 },
-        { "nome_alimento": "Arroz, integral, cozido", "quantidade_g": 100, "alimento_taco_id": 3 }
-      ]
-    }
-  ]
-}
-```
-
-A resposta (`201`) traz o plano com os ids, os blocos na ordem enviada e `totais`
-(`meta_kcal`, `meta_proteinas_g`). Regras: 1 a 12 blocos, cada um com 1 a 50 alimentos;
-`meta_kcal` até 10000 e `meta_proteinas_g` até 1000 por bloco; `quantidade_g` de 0 a
-5000 (exclusivo no zero).
-
-| Situação | Resposta |
-|---|---|
-| Sem token / token inválido | `401` |
-| Paciente tentando prescrever, ou nutricionista sem vínculo | `403` |
-| Paciente não existe | `404` |
-| `alimento_taco_id` inexistente ou dados inválidos | `422` |
-| `GET .../planos/ativo` sem plano prescrito | `404` `"Paciente sem plano ativo"` |
 
 ### Valores nutricionais
 
