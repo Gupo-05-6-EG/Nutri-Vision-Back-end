@@ -11,6 +11,7 @@ API REST do Nutri Vision, em **FastAPI + SQLAlchemy + PostgreSQL**.
 | Framework web | FastAPI |
 | ORM | SQLAlchemy 2.0 |
 | Migrations | Alembic |
+| Push | Firebase Cloud Messaging (firebase-admin) |
 | Banco | PostgreSQL 16 |
 | Testes | pytest (SQLite em memória) |
 | Lint/format | ruff |
@@ -209,6 +210,75 @@ o interpretador `.venv\Scripts\python.exe`, com argumento
 O campo `gamificacao_processada_em` impede crédito duplicado se o job for
 executado novamente no mesmo dia.
 
+### `lembretes_refeicao` — horário de lembrete por refeição (RF26)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | FK → `pacientes.id`, `ON DELETE CASCADE` |
+| `tipo` | varchar(20) | `cafe_da_manha` \| `almoco` \| `lanche` \| `jantar`; único por paciente (`uq_lembretes_refeicao_paciente_tipo`) |
+| `horario` | time | hora local (`America/Sao_Paulo`) em que o lembrete dispara |
+| `ativo` | boolean | `true` por padrão |
+| `ultimo_envio_em` | date | último dia em que o push foi enviado; garante no máximo 1 lembrete por refeição por dia |
+| `criado_em` / `atualizado_em` | timestamptz | auditoria |
+
+### `dispositivos_push` — token FCM dos aparelhos do paciente (RF26)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | FK → `pacientes.id`, `ON DELETE CASCADE`; indexado |
+| `token` | varchar(512) | token FCM; único. Se um token já registrado for enviado por outro paciente, ele passa a ser deste |
+| `criado_em` | timestamptz | |
+
+### Lembretes de refeição (RF26)
+
+O app salva o horário de cada refeição e registra o token FCM do aparelho; um job
+no backend envia o push quando a refeição não foi registrada.
+
+```bash
+# salva os horários (só os tipos enviados são alterados; "ativo" é opcional, padrão true)
+curl -X PUT http://localhost:8000/api/v1/pacientes/1/lembretes-refeicao \
+  -H 'Content-Type: application/json' \
+  -d '{"lembretes": [{"tipo": "cafe_da_manha", "horario": "07:30"}, {"tipo": "jantar", "horario": "20:00", "ativo": false}]}'
+
+# registra o token FCM do aparelho (idempotente)
+curl -X PUT http://localhost:8000/api/v1/pacientes/1/dispositivos-push \
+  -H 'Content-Type: application/json' -d '{"token": "<token FCM>"}'
+```
+
+**Regra do job.** Para cada lembrete ativo cujo horário já passou, se o paciente
+**não registrou** nenhuma refeição daquele `tipo` na janela da refeição, o job envia o
+push para todos os aparelhos dele — no máximo uma vez por dia (`ultimo_envio_em`).
+
+- **Janela:** do início da faixa do tipo até o momento do envio — café 05h, almoço 11h,
+  lanche 15h, jantar 18h (mesmas faixas do RF19). Se o horário configurado for anterior
+  ao início da faixa, a janela começa no horário.
+- **Tolerância:** o push só sai até 60 min depois do horário configurado
+  (`TOLERANCIA_ENVIO`), então um job parado ou um lembrete editado no fim do dia não
+  gera notificações atrasadas.
+- **Mudar o horário** de um lembrete libera um novo envio no mesmo dia, se ainda estiver
+  dentro da tolerância.
+- **Sem aparelho** registrado, ou se todos os envios falharem, nada é marcado como
+  enviado: a próxima execução tenta de novo (dentro da tolerância).
+- **Token inválido** (o FCM responde que não existe mais) é apagado de `dispositivos_push`.
+- Conteúdo do push: título "Hora de registrar sua refeição" e `data` com
+  `tipo_notificacao=lembrete_refeicao` e `tipo_refeicao=<tipo>` (para o app abrir a tela certa).
+
+**Configuração.** Gere uma chave de conta de serviço no Firebase (Configurações do projeto
+→ Contas de serviço) e aponte `FCM_CREDENTIALS_FILE` para o JSON. Nunca comite esse arquivo.
+No Docker, monte o arquivo no container e ajuste o caminho no `.env`.
+
+**Agendamento.** Rode a cada 5 minutos pelo cron do ambiente:
+
+```cron
+*/5 * * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.enviar_lembretes_refeicao
+```
+
+No Windows, use o Agendador de Tarefas repetindo a cada 5 minutos o interpretador
+`.venv\Scripts\python.exe` com o argumento `-m scripts.enviar_lembretes_refeicao` e o
+diretório de trabalho na raiz do projeto.
+
 ### `alimento_taco` — Banco Nutricional TACO (RF02.2)
 
 | Coluna | Tipo | Observação |
@@ -285,6 +355,9 @@ gravadas. O versionamento com auditoria é da Task 5.3 (RF08).
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
 | POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve um plano alimentar e o torna o plano ativo (RF09.1, 🔒 nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (RF09.1, 🔒 o próprio paciente ou nutricionista vinculado) |
+| GET | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Lista os horários de lembrete de refeição (RF26) |
+| PUT | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Salva os horários de lembrete por refeição (RF26) |
+| PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
 | GET | `/api/v1/alimentos?nome=&paciente_id=` | Busca unificada: TACO + alimentos personalizados do paciente (RF22) |

@@ -3,7 +3,7 @@
 Task 5.1 - Construtor de Planos Alimentares (RF09.1).
 
 Revision ID: 95a3f50655d5
-Revises: b7c8d9e0f123
+Revises: d3a5c1e7f902
 Create Date: 2026-10-26 19:57:45.774022
 
 """
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "95a3f50655d5"
-down_revision: str | None = "b7c8d9e0f123"
+down_revision: str | None = "d3a5c1e7f902"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

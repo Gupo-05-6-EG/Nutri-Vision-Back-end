@@ -40,6 +40,9 @@ class Settings(BaseSettings):
     # Servico de IA (usado a partir da Task 3.1)
     AI_SERVICE_URL: str = "http://localhost:8001"
 
+    # Push via Firebase Cloud Messaging (Task 2.8): caminho do JSON da conta de servico.
+    FCM_CREDENTIALS_FILE: str | None = None
+
     @property
     def is_production(self) -> bool:
         return self.ENVIRONMENT == "production"
