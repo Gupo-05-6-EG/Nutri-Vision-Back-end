@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 dias
 
+    # Criptografia de dados sensiveis em repouso (Task 1.6). Chave Fernet. Em
+    # producao, gere uma propria e guarde fora do repositorio:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    ENCRYPTION_KEY: str = "khW5PwcdjqnkKxVIr6dlJXX7i2qQv3HH656bD9NcTsU="
+
+    # HTTPS (Task 1.6): com True, redireciona http -> https e envia HSTS. Ligar em
+    # producao (atras de proxy, o proxy tem que mandar X-Forwarded-Proto).
+    HTTPS_ONLY: bool = False
+
     # Vinculacao paciente-nutricionista (Task 1.4)
     LINKING_CODE_EXPIRE_MINUTES: int = 60 * 24
 

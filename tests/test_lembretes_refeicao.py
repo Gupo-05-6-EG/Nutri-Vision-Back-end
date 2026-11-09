@@ -48,6 +48,12 @@ def _pacientes(db: Session) -> None:
         factories.criar_paciente(db, paciente_id)
 
 
+@pytest.fixture(autouse=True)
+def _logado_como_paciente_1(client: TestClient) -> None:
+    """Por padrao as requisicoes da API saem autenticadas como o paciente 1 (Task 1.6)."""
+    client.headers.update(factories.headers_de(1))
+
+
 def _lembrete(
     db: Session,
     tipo: TipoRefeicao = TipoRefeicao.ALMOCO,
@@ -93,9 +99,17 @@ def _refeicao(db: Session, tipo: TipoRefeicao, momento: datetime, paciente_id: i
 # --------------------------------------------------------------------------- API
 
 
-def _put(client: TestClient, lembretes: list[dict[str, Any]], paciente_id: int = 1):
+def _put(
+    client: TestClient,
+    lembretes: list[dict[str, Any]],
+    paciente_id: int = 1,
+    como: int | None = None,
+):
+    """PUT dos lembretes de `paciente_id`, autenticado como `como` (padrao: o proprio)."""
     return client.put(
-        f"/api/v1/pacientes/{paciente_id}/lembretes-refeicao", json={"lembretes": lembretes}
+        f"/api/v1/pacientes/{paciente_id}/lembretes-refeicao",
+        json={"lembretes": lembretes},
+        headers=factories.headers_de(como or paciente_id),
     )
 
 
@@ -140,7 +154,8 @@ def test_segundos_sao_descartados(client: TestClient) -> None:
 def test_lembretes_de_um_paciente_nao_aparecem_para_outro(client: TestClient) -> None:
     _put(client, [{"tipo": "almoco", "horario": "12:00"}], paciente_id=1)
 
-    assert client.get("/api/v1/pacientes/2/lembretes-refeicao").json()["lembretes"] == []
+    resposta = client.get("/api/v1/pacientes/2/lembretes-refeicao", headers=factories.headers_de(2))
+    assert resposta.json()["lembretes"] == []
 
 
 @pytest.mark.parametrize(
@@ -157,11 +172,14 @@ def test_corpo_invalido_retorna_422(client: TestClient, lembretes: list[dict[str
     assert _put(client, lembretes).status_code == 422
 
 
-def test_paciente_inexistente_retorna_404(client: TestClient) -> None:
-    assert client.get("/api/v1/pacientes/99/lembretes-refeicao").status_code == 404
-    assert _put(client, [{"tipo": "almoco", "horario": "12:00"}], paciente_id=99).status_code == 404
+def test_paciente_inexistente_retorna_403(client: TestClient) -> None:
+    # Ninguem alem do proprio paciente acessa, entao um id que nao existe tambem
+    # cai no 403 e a API nao revela quais ids existem.
+    assert client.get("/api/v1/pacientes/99/lembretes-refeicao").status_code == 403
+    lembrete = [{"tipo": "almoco", "horario": "12:00"}]
+    assert _put(client, lembrete, paciente_id=99, como=1).status_code == 403
     resposta = client.put("/api/v1/pacientes/99/dispositivos-push", json={"token": "abc"})
-    assert resposta.status_code == 404
+    assert resposta.status_code == 403
 
 
 def test_registra_dispositivo_de_forma_idempotente(client: TestClient, db: Session) -> None:
@@ -175,7 +193,11 @@ def test_registra_dispositivo_de_forma_idempotente(client: TestClient, db: Sessi
 
 def test_token_ja_registrado_passa_para_o_novo_paciente(client: TestClient, db: Session) -> None:
     client.put("/api/v1/pacientes/1/dispositivos-push", json={"token": "abc"})
-    client.put("/api/v1/pacientes/2/dispositivos-push", json={"token": "abc"})
+    client.put(
+        "/api/v1/pacientes/2/dispositivos-push",
+        json={"token": "abc"},
+        headers=factories.headers_de(2),
+    )
 
     dispositivos = db.execute(select(DispositivoPush)).scalars().all()
     assert [(d.paciente_id, d.token) for d in dispositivos] == [(2, "abc")]
