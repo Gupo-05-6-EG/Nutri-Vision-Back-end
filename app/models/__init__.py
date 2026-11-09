@@ -9,12 +9,14 @@ from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.alimento_taco import AlimentoTaco
 from app.models.lembrete_refeicao import DispositivoPush, LembreteRefeicao
 from app.models.paciente import Genero, NivelAtividade, Paciente
+from app.models.plano_alimentar import AlimentoRefeicaoPlano, PlanoAlimentar, RefeicaoPlano
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.models.usuario import Nutricionista, Perfil, Usuario
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
 
 __all__ = [
     "AlimentoPersonalizado",
+    "AlimentoRefeicaoPlano",
     "AlimentoTaco",
     "Base",
     "CodigoVinculacao",
@@ -26,7 +28,9 @@ __all__ = [
     "Nutricionista",
     "Paciente",
     "Perfil",
+    "PlanoAlimentar",
     "Refeicao",
+    "RefeicaoPlano",
     "StatusCodigoVinculacao",
     "TipoRefeicao",
     "Usuario",
