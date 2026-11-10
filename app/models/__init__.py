@@ -8,6 +8,7 @@ from app.db.base import Base
 from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.alimento_taco import AlimentoTaco
 from app.models.consentimento import Consentimento
+from app.models.desafio import Desafio, ParticipanteDesafio, StatusParticipante, TipoDesafio
 from app.models.paciente import Genero, NivelAtividade, Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.models.usuario import Nutricionista, Perfil, Usuario
@@ -19,16 +20,20 @@ __all__ = [
     "Base",
     "CodigoVinculacao",
     "Consentimento",
+    "Desafio",
     "Genero",
     "ItemRefeicao",
     "NivelAtividade",
     "Nutricionista",
     "Paciente",
+    "ParticipanteDesafio",
     "Perfil",
     "Refeicao",
     "StatusCodigoVinculacao",
+    "StatusParticipante",
     "StatusVinculo",
     "TipoRefeicao",
+    "TipoDesafio",
     "Usuario",
     "Vinculo",
 ]
