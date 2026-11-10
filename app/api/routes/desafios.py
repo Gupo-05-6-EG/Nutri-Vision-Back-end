@@ -73,9 +73,7 @@ def responder_convite(
         servico.ConviteInvalido,
     ) as erro:
         _http_error(erro)
-    return ParticipanteOut(
-        paciente_id=usuario.id, nome=usuario.nome, status=participante.status
-    )
+    return ParticipanteOut(paciente_id=usuario.id, nome=usuario.nome, status=participante.status)
 
 
 @router.get("", response_model=list[DesafioOut])

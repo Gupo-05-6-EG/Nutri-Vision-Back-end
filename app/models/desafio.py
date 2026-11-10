@@ -52,9 +52,7 @@ class Desafio(Base):
 
 class ParticipanteDesafio(Base):
     __tablename__ = "participantes_desafio"
-    __table_args__ = (
-        UniqueConstraint("desafio_id", "paciente_id", name="desafio_paciente"),
-    )
+    __table_args__ = (UniqueConstraint("desafio_id", "paciente_id"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     desafio_id: Mapped[int] = mapped_column(

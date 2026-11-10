@@ -41,9 +41,7 @@ def _criar_refeicao(db: Session, paciente_id: int, tipo: TipoRefeicao, hora: int
     db.commit()
 
 
-def test_criar_convidar_aceitar_e_consultar_placar(
-    client: TestClient, db: Session
-) -> None:
+def test_criar_convidar_aceitar_e_consultar_placar(client: TestClient, db: Session) -> None:
     primeiro = factories.criar_paciente(db, 1)
     segundo = factories.criar_paciente(db, 2)
     primeiro.meta_kcal = segundo.meta_kcal = Decimal("2000")
@@ -86,9 +84,7 @@ def test_criar_convidar_aceitar_e_consultar_placar(
     assert [p["pontuacao"] for p in placar.json()["participantes"]] == [1, 0]
 
 
-def test_convite_de_outro_paciente_nao_pode_ser_respondido(
-    client: TestClient, db: Session
-) -> None:
+def test_convite_de_outro_paciente_nao_pode_ser_respondido(client: TestClient, db: Session) -> None:
     factories.criar_paciente(db, 1)
     factories.criar_paciente(db, 2)
     factories.criar_paciente(db, 3)

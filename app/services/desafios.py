@@ -94,14 +94,18 @@ def convidar(
     if usuario.id in ids:
         raise ConviteInvalido
     _garantir_pacientes(db, ids)
-    existentes = set(
-        db.scalars(
-            select(ParticipanteDesafio.paciente_id).where(
-                ParticipanteDesafio.desafio_id == desafio_id,
-                ParticipanteDesafio.paciente_id.in_(ids),
-            )
-        ).all()
-    ) if ids else set()
+    existentes = (
+        set(
+            db.scalars(
+                select(ParticipanteDesafio.paciente_id).where(
+                    ParticipanteDesafio.desafio_id == desafio_id,
+                    ParticipanteDesafio.paciente_id.in_(ids),
+                )
+            ).all()
+        )
+        if ids
+        else set()
+    )
     if existentes:
         raise ConviteInvalido
     db.add_all(
@@ -157,9 +161,7 @@ def listar_desafios(db: Session, usuario: Usuario) -> list[tuple[Desafio, str]]:
     return list(rows.all())
 
 
-def _pontuacoes(
-    db: Session, desafio: Desafio, tipo: str
-) -> list[tuple[int, str, Decimal | None]]:
+def _pontuacoes(db: Session, desafio: Desafio, tipo: str) -> list[tuple[int, str, Decimal | None]]:
     membros = db.execute(
         select(ParticipanteDesafio.paciente_id, Usuario.nome)
         .join(Usuario, Usuario.id == ParticipanteDesafio.paciente_id)
@@ -208,11 +210,15 @@ def _pontuacoes(
     inicio_em = desafio.inicio_em
     fim_em = desafio.fim_em
     inicio = (
-        inicio_em.replace(tzinfo=UTC) if inicio_em.tzinfo is None else inicio_em
-    ).astimezone(FUSO_HORARIO).date()
-    fim = (fim_em.replace(tzinfo=UTC) if fim_em.tzinfo is None else fim_em).astimezone(
-        FUSO_HORARIO
-    ).date()
+        (inicio_em.replace(tzinfo=UTC) if inicio_em.tzinfo is None else inicio_em)
+        .astimezone(FUSO_HORARIO)
+        .date()
+    )
+    fim = (
+        (fim_em.replace(tzinfo=UTC) if fim_em.tzinfo is None else fim_em)
+        .astimezone(FUSO_HORARIO)
+        .date()
+    )
     dias = max(1, (fim - inicio).days + 1)
     for paciente_id, nome in membros:
         totais = por_dia[paciente_id]
@@ -220,9 +226,8 @@ def _pontuacoes(
             tipos_esperados = {tipo_refeicao.value for tipo_refeicao in TipoRefeicao}
             pontuacao = Decimal(
                 sum(
-                    tipos_por_dia[paciente_id][
-                        inicio.fromordinal(inicio.toordinal() + offset)
-                    ] >= tipos_esperados
+                    tipos_por_dia[paciente_id][inicio.fromordinal(inicio.toordinal() + offset)]
+                    >= tipos_esperados
                     for offset in range(dias)
                 )
             )
@@ -232,9 +237,7 @@ def _pontuacoes(
                 sum(
                     (
                         abs(
-                            totais.get(
-                                inicio.fromordinal(inicio.toordinal() + offset), Decimal(0)
-                            )
+                            totais.get(inicio.fromordinal(inicio.toordinal() + offset), Decimal(0))
                             - meta
                         )
                         for offset in range(dias)
