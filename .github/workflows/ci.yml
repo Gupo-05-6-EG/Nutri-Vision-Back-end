@@ -84,7 +84,9 @@ jobs:
 
   backup:
     name: Backup e restauracao contra Postgres
-    runs-on: ubuntu-latest
+    # Fixo em 24.04: o ubuntu-latest novo nao tem o postgresql-client-16 no apt,
+    # e o pg_dump precisa ser da mesma versao do servico postgres:16.
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:16-alpine
