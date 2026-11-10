@@ -27,6 +27,15 @@ class Settings(BaseSettings):
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24 * 7  # 7 dias
 
+    # Criptografia de dados sensiveis em repouso (Task 1.6). Chave Fernet. Em
+    # producao, gere uma propria e guarde fora do repositorio:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    ENCRYPTION_KEY: str = "khW5PwcdjqnkKxVIr6dlJXX7i2qQv3HH656bD9NcTsU="
+
+    # HTTPS (Task 1.6): com True, redireciona http -> https e envia HSTS. Ligar em
+    # producao (atras de proxy, o proxy tem que mandar X-Forwarded-Proto).
+    HTTPS_ONLY: bool = False
+
     # Vinculacao paciente-nutricionista (Task 1.4)
     LINKING_CODE_EXPIRE_MINUTES: int = 60 * 24
 
@@ -43,6 +52,9 @@ class Settings(BaseSettings):
 
     # Servico de IA (usado a partir da Task 3.1)
     AI_SERVICE_URL: str = "http://localhost:8001"
+
+    # Push via Firebase Cloud Messaging (Task 2.8): caminho do JSON da conta de servico.
+    FCM_CREDENTIALS_FILE: str | None = None
 
     @property
     def is_production(self) -> bool:

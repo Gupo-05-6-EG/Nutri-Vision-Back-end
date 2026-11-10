@@ -42,7 +42,8 @@ def test_loga_um_acesso_por_requisicao(
     (acesso,) = _acessos(caplog)
     assert acesso.metodo == "GET"
     assert acesso.caminho == "/api/v1/refeicoes/999"
-    assert acesso.status == 404
+    # Sem token a rota responde 401 (Task 1.6); o log registra o status real.
+    assert acesso.status == 401
     assert acesso.duracao_ms >= 0
 
 
