@@ -3,11 +3,12 @@
 Recebe as classes reconhecidas pelo modelo de IA com o metodo de preparo e as
 gramas, mapeia cada uma para a TACO e devolve kcal, proteinas, carboidratos e
 gorduras por item e da refeicao. Nao grava nada: o registro da refeicao
-continua em `POST /refeicoes`.
+continua em `POST /refeicoes`. Exige token de qualquer perfil (Task 1.6).
 """
 
 from fastapi import APIRouter, HTTPException, status
 
+from app.api.deps import UsuarioAtual
 from app.db.deps import DbSession
 from app.schemas.calculo_nutricional import CalculoNutricionalIn, CalculoNutricionalOut
 from app.services import calculo_nutricional as servico
@@ -20,7 +21,9 @@ router = APIRouter(prefix="/calculo-nutricional", tags=["calculo-nutricional"])
     response_model=CalculoNutricionalOut,
     summary="Calcula a tabela nutricional da refeicao a partir das classes da IA",
 )
-def calcular(dados: CalculoNutricionalIn, db: DbSession) -> CalculoNutricionalOut:
+def calcular(
+    dados: CalculoNutricionalIn, db: DbSession, _usuario: UsuarioAtual
+) -> CalculoNutricionalOut:
     try:
         resultado = servico.calcular_refeicao(db, dados.itens)
     except servico.SemMapeamento as erro:

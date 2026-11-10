@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, develop]
+    branches: [main, dev]
   # Sem filtro de branch: PRs empilhados (base numa feature branch) tambem
   # precisam de CI, e com o filtro eles ficavam sem nenhum check.
   pull_request:
@@ -43,7 +43,7 @@ jobs:
       - name: pytest
         env:
           TEST_DATABASE_URL: "sqlite+pysqlite:///:memory:"
-        run: pytest --cov=app --cov-report=term-missing --cov-report=xml
+        run: pytest --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=90
       - uses: actions/upload-artifact@v4
         if: always()
         with:
