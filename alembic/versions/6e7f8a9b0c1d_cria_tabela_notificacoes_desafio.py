@@ -81,3 +81,4 @@ def downgrade() -> None:
         op.f("ix_notificacoes_desafio_paciente_id"), table_name="notificacoes_desafio"
     )
     op.drop_table("notificacoes_desafio")
+
