@@ -433,6 +433,38 @@ personalizados); como os ids se repetem entre as duas tabelas, o alimento é ide
 por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) → `409`.
 `GET /api/v1/alimentos-taco` continua buscando só na TACO.
 
+### `planos_alimentares` — versões do plano do paciente (RF08)
+
+Cada vez que o nutricionista salva o plano, nasce uma linha nova (uma **versão**) e a
+anterior é desativada; as antigas ficam no banco, sem alteração.
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `versao` | int | número sequencial por paciente (1 = primeiro plano); `UNIQUE (paciente_id, versao)` |
+| `ativo` | bool | só a versão mais nova fica `true` |
+| `nutricionista_id` | int \| null | autor da versão; vira `null` se a conta for removida |
+
+A migration `c4d9e1f6a2b3` numera os planos que já existiam (1, 2, 3... na ordem de criação).
+
+### `auditorias` — quem mudou o quê (RNF08)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | FK `pacientes.id`, `ON DELETE CASCADE` (apagar o paciente apaga as cópias de dados de saúde) |
+| `autor_id` | int \| null | FK `usuarios.id`, `ON DELETE SET NULL` (a auditoria sobrevive à conta de quem alterou) |
+| `entidade` | varchar(30) | `plano_alimentar` ou `dados_clinicos` |
+| `registro_id` | int | o plano (versão nova) ou o próprio paciente |
+| `acao` | varchar(20) | `criacao` (não havia valor antes) ou `atualizacao` |
+| `antes` | texto cifrado (JSON) | valores antes da alteração; `null` na criação |
+| `depois` | texto cifrado (JSON) | valores depois da alteração |
+| `criado_em` | timestamptz | quando |
+
+Só recebe linhas novas: nenhuma rota edita ou apaga auditoria. `antes` e `depois` são
+cópias de dados de saúde, então vão **cifrados** para o banco (mesma `ENCRYPTION_KEY` do
+RNF06). A linha de auditoria entra na mesma transação da alteração: ou as duas
+acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
+
 ## Endpoints
 
 | Método | Rota | Descrição |
@@ -452,6 +484,9 @@ por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) →
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
+| POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve ou edita o plano: salva uma versão nova e a torna a ativa (🔒 nutricionista vinculado) |
+| GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (🔒 nutricionista vinculado ou o próprio paciente) |
+| GET | `/api/v1/pacientes/{paciente_id}/planos/versoes` | Histórico de versões do plano, da mais nova para a mais antiga (RF08, 🔒 nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Lista os horários de lembrete de refeição (RF26) |
 | PUT | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Salva os horários de lembrete por refeição (RF26) |
 | PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |
@@ -640,6 +675,30 @@ Permite o vínculo entre paciente e nutricionista por meio de um código tempor�
 
 **Migrations e Integridade Referencial:**
 A migration `9c2f8f2d7d1a` (depois da `4895cf62af9e`, que cria `usuarios` e `nutricionistas`) cria `codigo_vinculacao` e `vinculos` com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
+
+### Versionamento e auditoria do plano (RF08, RNF08)
+
+Não existe um "editar plano" separado: o app do nutricionista parte do plano ativo,
+muda o que quiser e chama `POST /api/v1/pacientes/{id}/planos` de novo. Cada chamada:
+
+1. cria a **versão** seguinte (`versao` = maior versão do paciente + 1) e desativa a anterior;
+2. grava em `auditorias` o plano de **antes** (o ativo até então, `null` no primeiro) e o de
+   **depois**, com o autor e o horário. Uma chamada recusada (`403`, `422`...) não cria versão
+   nem auditoria.
+
+`GET /api/v1/pacientes/{id}/planos/versoes` devolve todas as versões, da mais nova para a
+mais antiga. Cada item é o plano completo daquela versão (mesmos campos de `POST /planos`)
+mais `versao` e `autor` (`{id, nome}`, ou `null` se a conta do nutricionista foi removida).
+Lista vazia se o paciente nunca teve plano.
+
+- `401`: sem token ou token inválido.
+- `403`: perfil que não é nutricionista (`Perfil nao autorizado`), ou nutricionista sem vínculo com o paciente (`Sem vinculo com este paciente`).
+- `404`: paciente não encontrado.
+
+A auditoria também registra os **dados clínicos**: cada `POST /pacientes/{id}/triagem` que
+muda peso, altura, idade, gênero, nível de atividade ou a meta calórica grava os valores de
+antes e depois, tendo o paciente como autor. Refazer a triagem com os mesmos valores não
+gera registro. Ainda não há endpoint para consultar a tabela `auditorias`.
 
 ### Valores nutricionais
 

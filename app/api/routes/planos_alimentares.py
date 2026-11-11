@@ -1,7 +1,8 @@
-"""Endpoints do plano alimentar (RF09.1).
+"""Endpoints do plano alimentar (RF09.1) e do historico de versoes (RF08, RNF08).
 
-Exigem o token do login. So o nutricionista vinculado ao paciente prescreve;
-o plano ativo pode ser lido por ele ou pelo proprio paciente (Task 2.9).
+Exigem o token do login. So o nutricionista vinculado ao paciente prescreve e
+consulta o historico de versoes; o plano ativo pode ser lido por ele ou pelo
+proprio paciente (Task 2.9).
 """
 
 from typing import Annotated
@@ -11,7 +12,12 @@ from fastapi import APIRouter, Depends, HTTPException, Path, status
 from app.api.deps import UsuarioAtual, exigir_perfil
 from app.db.deps import DbSession
 from app.models.usuario import Perfil, Usuario
-from app.schemas.plano_alimentar import PlanoAlimentarIn, PlanoAlimentarOut
+from app.schemas.plano_alimentar import (
+    AutorPlanoOut,
+    PlanoAlimentarIn,
+    PlanoAlimentarOut,
+    PlanoVersaoOut,
+)
 from app.services import planos_alimentares as servico
 
 router = APIRouter(prefix="/pacientes", tags=["planos-alimentares"])
@@ -30,7 +36,7 @@ def _erro_de_acesso(erro: Exception) -> HTTPException:
     "/{paciente_id}/planos",
     response_model=PlanoAlimentarOut,
     status_code=status.HTTP_201_CREATED,
-    summary="Prescreve um plano alimentar e o torna o plano ativo do paciente",
+    summary="Prescreve ou edita o plano: salva uma versao nova e a torna a ativa",
 )
 def prescrever_plano(
     paciente_id: PacienteId,
@@ -62,3 +68,24 @@ def plano_ativo(paciente_id: PacienteId, db: DbSession, usuario: UsuarioAtual) -
     except servico.PlanoNaoEncontrado:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Paciente sem plano ativo") from None
     return PlanoAlimentarOut.model_validate(plano)
+
+
+@router.get(
+    "/{paciente_id}/planos/versoes",
+    response_model=list[PlanoVersaoOut],
+    summary="Historico de versoes do plano do paciente, da mais nova para a mais antiga",
+)
+def historico_de_versoes(
+    paciente_id: PacienteId, db: DbSession, nutricionista: NutricionistaAutenticado
+) -> list[PlanoVersaoOut]:
+    try:
+        versoes = servico.historico_de_versoes(db, nutricionista, paciente_id)
+    except (servico.PacienteNaoEncontrado, servico.AcessoNegado) as erro:
+        raise _erro_de_acesso(erro) from None
+
+    historico = []
+    for plano, autor in versoes:
+        versao = PlanoVersaoOut.model_validate(plano)
+        versao.autor = AutorPlanoOut.model_validate(autor) if autor is not None else None
+        historico.append(versao)
+    return historico

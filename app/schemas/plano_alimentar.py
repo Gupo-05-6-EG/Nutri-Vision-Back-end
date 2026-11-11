@@ -99,6 +99,8 @@ class PlanoAlimentarOut(BaseModel):
     id: int
     paciente_id: int
     nutricionista_id: int | None
+    # Numero da versao do plano para o paciente (1 = primeiro plano).
+    versao: int
     titulo: str
     observacao: str | None
     ativo: bool
@@ -109,3 +111,21 @@ class PlanoAlimentarOut(BaseModel):
     @field_serializer("criado_em")
     def _com_fuso(self, valor: datetime) -> datetime:
         return valor if valor.tzinfo else valor.replace(tzinfo=UTC)
+
+
+class AutorPlanoOut(BaseModel):
+    """Nutricionista que salvou uma versao do plano."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome: str
+
+
+class PlanoVersaoOut(PlanoAlimentarOut):
+    """Uma versao no historico: o plano completo daquela versao, mais o autor.
+
+    `autor` e nulo quando a conta do nutricionista foi removida depois.
+    """
+
+    autor: AutorPlanoOut | None = None
