@@ -7,6 +7,7 @@ from app.api.routes import (
     alimentos_taco,
     auth,
     calculo_nutricional,
+    desafios,
     health,
     lembretes_refeicao,
     pacientes,
@@ -26,3 +27,4 @@ api_router.include_router(lembretes_refeicao.router)
 api_router.include_router(refeicoes.router)
 api_router.include_router(calculo_nutricional.router)
 api_router.include_router(vinculos.router)
+api_router.include_router(desafios.router)

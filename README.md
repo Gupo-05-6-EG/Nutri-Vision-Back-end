@@ -77,6 +77,46 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+## Desafios entre amigos (RF05.2, RF05.3, RF05.5)
+
+Depois de aplicar as migrations, pacientes autenticados podem criar desafios e
+convidar outros pacientes pelo ID. O convite precisa ser aceito para a pessoa
+entrar no placar. Tipos aceitos: `refeicoes` (dias em que as quatro categorias
+de refeição foram registradas), `variacao_calorica` (menor média de diferença absoluta entre o
+consumo diário e a meta calórica) e `sequencia_meta` (maior sequência de dias
+com pelo menos duas refeições e consumo até 30% da meta, seguindo o critério
+do processamento diário de gamificação). A variação calórica inclui dias sem
+registro como consumo zero. As datas são enviadas com fuso horário.
+
+- `POST /api/v1/challenges`: cria desafio; corpo: `nome`, `tipo`, `regra`,
+  `inicio_em`, `fim_em` e `convidados` (lista de IDs de pacientes, opcional).
+- `POST /api/v1/challenges/{id}/invites`: convida mais pacientes; corpo:
+  `pacientes` (lista de IDs).
+- `POST /api/v1/challenges/{id}/response`: aceita ou recusa; corpo:
+  `aceitar` (booleano).
+- `GET /api/v1/challenges`: lista desafios dos quais o usuário participa ou
+  para os quais foi convidado, com seu status.
+- `GET /api/v1/challenges/{id}/leaderboard`: retorna posições e pontuações;
+  apenas participantes que aceitaram o convite podem consultar o placar.
+
+### Notificações motivacionais de desafios via FCM (RF05.5)
+
+O job diário (`python -m scripts.enviar_notificacoes_desafios`) percorre os desafios ativos
+(`inicio_em <= agora <= fim_em`), calcula a posição de cada participante com convite aceito
+e envia uma notificação push via FCM para os aparelhos registrados em `dispositivos_push`
+(ex.: `"Você está em 2º lugar — faltam 2 dias para vencer o desafio!"`).
+
+- **Limite de frequência:** a tabela `notificacoes_desafio` possui restrição única por
+  `(paciente_id, enviado_em)` no fuso `America/Sao_Paulo`, garantindo no máximo **1 push de
+  desafio por participante por dia**, mesmo que o participante esteja em múltiplos desafios
+  simultâneos ou que o job seja executado mais de uma vez no mesmo dia.
+- **Tokens inválidos** reportados pelo FCM são removidos automaticamente de `dispositivos_push`.
+
+```cron
+CRON_TZ=America/Sao_Paulo
+0 9 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.enviar_notificacoes_desafios
+```
+
 ## Populando a TACO
 
 Depois das migrations (`alembic upgrade head`), importe a Tabela Brasileira de
