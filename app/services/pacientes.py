@@ -13,12 +13,20 @@ from app.services.calculo_basal import (
 ORIGEM_HARRIS_BENEDICT = "harris_benedict"
 
 
+class PacienteNaoEncontrado(Exception):
+    """Nao existe paciente cadastrado com o id informado."""
+
+
 def registrar_triagem(db: Session, paciente_id: int, dados: TriagemIn) -> dict[str, object]:
     """Calcula o teto calorico diario inicial e salva no paciente.
 
-    Se o paciente ainda nao existe, ele e criado. Se ja existe, a triagem e o
-    teto sao sobrescritos, entao refazer a triagem gera um novo teto.
+    O paciente nasce no cadastro (RF13). Refazer a triagem sobrescreve os dados
+    e gera um novo teto.
     """
+    paciente = db.get(Paciente, paciente_id)
+    if paciente is None:
+        raise PacienteNaoEncontrado
+
     tmb = calcular_tmb(
         peso_kg=dados.peso_kg,
         altura_cm=dados.altura_cm,
@@ -26,11 +34,6 @@ def registrar_triagem(db: Session, paciente_id: int, dados: TriagemIn) -> dict[s
         genero=dados.genero,
     )
     teto = calcular_teto_calorico(tmb, dados.nivel_atividade)
-
-    paciente = db.get(Paciente, paciente_id)
-    if paciente is None:
-        paciente = Paciente(id=paciente_id)
-        db.add(paciente)
 
     paciente.peso_kg = dados.peso_kg
     paciente.altura_cm = dados.altura_cm

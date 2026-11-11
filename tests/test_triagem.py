@@ -27,8 +27,21 @@ from app.services.calculo_basal import (
     calcular_teto_calorico,
     calcular_tmb,
 )
+from tests import factories
 
 MAX_NUMERIC_6_2 = Decimal("9999.99")
+
+
+@pytest.fixture(autouse=True)
+def _pacientes(db: Session) -> None:
+    for paciente_id in (1, 2, 7):
+        factories.criar_paciente(db, paciente_id)
+
+
+@pytest.fixture(autouse=True)
+def _logado_como_paciente_1(client: TestClient) -> None:
+    """Por padrao as requisicoes saem como o paciente 1; quem usa outro id manda o header."""
+    client.headers.update(factories.headers_de(1))
 
 
 def _payload(**alteracoes: Any) -> dict[str, Any]:
@@ -42,6 +55,10 @@ def _payload(**alteracoes: Any) -> dict[str, Any]:
     }
     corpo.update(alteracoes)
     return corpo
+
+
+def _como(paciente_id: int) -> dict[str, str]:
+    return factories.headers_de(paciente_id)
 
 
 def _rota(paciente_id: int | str = 1) -> str:
@@ -91,7 +108,7 @@ class TestFormula:
 
 class TestEndpoint:
     def test_devolve_tmb_fator_e_teto(self, client: TestClient) -> None:
-        resposta = client.post(_rota(7), json=_payload())
+        resposta = client.post(_rota(7), json=_payload(), headers=_como(7))
 
         assert resposta.status_code == 200, resposta.text
         assert resposta.json() == {
@@ -127,7 +144,7 @@ class TestEndpoint:
         assert resposta.status_code == 200, resposta.text
 
     def test_salva_triagem_e_teto_no_paciente(self, client: TestClient, db: Session) -> None:
-        client.post(_rota(7), json=_payload())
+        client.post(_rota(7), json=_payload(), headers=_como(7))
 
         db.expire_all()
         paciente = db.get(Paciente, 7)
@@ -141,8 +158,12 @@ class TestEndpoint:
         assert paciente.origem_meta == "harris_benedict"
 
     def test_refazer_a_triagem_atualiza_sem_duplicar(self, client: TestClient, db: Session) -> None:
-        client.post(_rota(7), json=_payload())
-        resposta = client.post(_rota(7), json=_payload(peso_kg="70", nivel_atividade="sedentario"))
+        client.post(_rota(7), json=_payload(), headers=_como(7))
+        resposta = client.post(
+            _rota(7),
+            json=_payload(peso_kg="70", nivel_atividade="sedentario"),
+            headers=_como(7),
+        )
 
         assert resposta.status_code == 200, resposta.text
         # 66.47 + 13.75*70 + 5.003*180 - 6.755*30 = 1726.86 ; x 1.2 = 2072.232
@@ -157,7 +178,11 @@ class TestEndpoint:
 
     def test_pacientes_diferentes_nao_se_misturam(self, client: TestClient, db: Session) -> None:
         client.post(_rota(1), json=_payload())
-        client.post(_rota(2), json=_payload(genero="feminino", nivel_atividade="intenso"))
+        client.post(
+            _rota(2),
+            json=_payload(genero="feminino", nivel_atividade="intenso"),
+            headers=_como(2),
+        )
 
         db.expire_all()
         um, dois = db.get(Paciente, 1), db.get(Paciente, 2)
@@ -194,7 +219,10 @@ class TestValidacao:
         resposta = client.post(_rota(), json=_payload(**alteracao))
 
         assert resposta.status_code == 422
-        assert db.get(Paciente, 1) is None, "nada deve ser salvo quando a triagem e invalida"
+        db.expire_all()
+        paciente = db.get(Paciente, 1)
+        assert paciente is not None
+        assert paciente.meta_kcal is None, "nada deve ser salvo quando a triagem e invalida"
 
     @pytest.mark.parametrize(
         "campo", ["peso_kg", "altura_cm", "idade", "genero", "nivel_atividade"]
@@ -206,6 +234,16 @@ class TestValidacao:
         resposta = client.post(_rota(), json=corpo)
 
         assert resposta.status_code == 422
+
+    def test_paciente_inexistente_da_403_e_nao_cria_paciente(
+        self, client: TestClient, db: Session
+    ) -> None:
+        # So o proprio paciente faz a triagem; um id que nao existe tambem cai no 403
+        # para a API nao revelar quais ids existem.
+        resposta = client.post(_rota(999), json=_payload())
+
+        assert resposta.status_code == 403
+        assert db.get(Paciente, 999) is None, "a triagem nao cria paciente"
 
     @pytest.mark.parametrize("paciente_id", ["0", "-1", "abc"])
     def test_recusa_paciente_id_invalido(self, client: TestClient, paciente_id: str) -> None:

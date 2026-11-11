@@ -9,20 +9,35 @@ from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.alimento_taco import AlimentoTaco
 from app.models.amizade import Amizade, StatusAmizade
 from app.models.historico_xp import HistoricoXP
+from app.models.lembrete_refeicao import DispositivoPush, LembreteRefeicao
 from app.models.paciente import Genero, NivelAtividade, Paciente
+from app.models.plano_alimentar import AlimentoRefeicaoPlano, PlanoAlimentar, RefeicaoPlano
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
+from app.models.usuario import Nutricionista, Perfil, Usuario
+from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
 
 __all__ = [
     "AlimentoPersonalizado",
+    "AlimentoRefeicaoPlano",
     "AlimentoTaco",
     "Amizade",
     "Base",
+    "CodigoVinculacao",
+    "DispositivoPush",
     "Genero",
     "HistoricoXP",
     "ItemRefeicao",
+    "LembreteRefeicao",
     "NivelAtividade",
+    "Nutricionista",
     "Paciente",
+    "Perfil",
+    "PlanoAlimentar",
     "Refeicao",
+    "RefeicaoPlano",
     "StatusAmizade",
+    "StatusCodigoVinculacao",
     "TipoRefeicao",
+    "Usuario",
+    "Vinculo",
 ]

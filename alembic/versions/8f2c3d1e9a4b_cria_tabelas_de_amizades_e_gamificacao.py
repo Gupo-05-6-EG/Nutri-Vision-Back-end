@@ -1,9 +1,9 @@
-"""cria tabelas de amizades e gamificacao
+"""cria tabelas de amizades e historico de xp
 
 Task 4.3 [Back] - Sistema Social e Leaderboard (RF05).
 
 Revision ID: 8f2c3d1e9a4b
-Revises: 7d1e3b9a4c20
+Revises: a8e2f4c61b07
 Create Date: 2026-10-26 20:00:00.000000
 
 """
@@ -14,23 +14,16 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "8f2c3d1e9a4b"
-down_revision: str | None = "7d1e3b9a4c20"
+down_revision: str | None = "a8e2f4c61b07"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    # 1. Amplia a tabela de pacientes com campos de identidade social e gamificacao (DER 3.3, RF05, RF16)
+    # 1. Amplia a tabela de pacientes com campo de identidade social (DER 3.3, RF05)
+    # Obs: streak e xp ja foram criados em b7c8d9e0f123 (Task 4.1)
     op.add_column("pacientes", sa.Column("username", sa.String(length=50), nullable=True))
     op.create_index(op.f("ix_pacientes_username"), "pacientes", ["username"], unique=True)
-    op.add_column("pacientes", sa.Column("streak", sa.Integer(), server_default="0", nullable=False))
-    op.add_column("pacientes", sa.Column("xp", sa.Integer(), server_default="0", nullable=False))
-    op.create_check_constraint(
-        op.f("ck_pacientes_streak_nao_negativo"), "pacientes", "streak >= 0"
-    )
-    op.create_check_constraint(
-        op.f("ck_pacientes_xp_nao_negativo"), "pacientes", "xp >= 0"
-    )
 
     # 2. Cria a tabela de amizades (DER 3.6, RF05)
     op.create_table(
@@ -109,9 +102,5 @@ def downgrade() -> None:
     op.drop_index(op.f("ix_amizades_pac_id"), table_name="amizades")
     op.drop_table("amizades")
 
-    op.drop_constraint(op.f("ck_pacientes_xp_nao_negativo"), "pacientes", type_="check")
-    op.drop_constraint(op.f("ck_pacientes_streak_nao_negativo"), "pacientes", type_="check")
-    op.drop_column("pacientes", "xp")
-    op.drop_column("pacientes", "streak")
     op.drop_index(op.f("ix_pacientes_username"), table_name="pacientes")
     op.drop_column("pacientes", "username")

@@ -1,0 +1,54 @@
+# Producao (Task 7.1, RNF09/RNF11). Usa por cima do docker-compose.yml:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Diferencas para o desenvolvimento: sem --reload nem codigo montado, migrations
+# aplicadas na subida, restart automatico, healthcheck de readiness, logs em
+# JSON com rotacao e API escalavel (`--scale api=N` atras de um proxy).
+x-logs: &logs
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  db:
+    <<: *logs
+    restart: unless-stopped
+    # O banco nao fica exposto fora da rede do compose.
+    ports: !reset []
+
+  api:
+    <<: *logs
+    restart: unless-stopped
+    container_name: !reset null
+    ports: !reset []
+    expose: ["8000"]
+    volumes: !reset []
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+    command: >-
+      sh -c "alembic upgrade head &&
+      exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
+      --forwarded-allow-ips='*' --workers $${WEB_CONCURRENCY}"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/v1/health/db"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  # Porta de entrada unica; distribui entre as replicas da API.
+  proxy:
+    <<: *logs
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy

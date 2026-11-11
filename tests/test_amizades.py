@@ -5,33 +5,34 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.paciente import Paciente
+from tests import factories
+
+
+def _criar_paciente_social(
+    db: Session, paciente_id: int, username: str, streak: int, xp: int
+) -> Paciente:
+    p = factories.criar_paciente(db, paciente_id)
+    p.username = username
+    p.streak = streak
+    p.xp = xp
+    db.commit()
+    db.refresh(p)
+    return p
 
 
 @pytest.fixture
 def paciente_a(db: Session) -> Paciente:
-    p = Paciente(id=1, username="atleta_joao", streak=5, xp=150)
-    db.add(p)
-    db.commit()
-    db.refresh(p)
-    return p
+    return _criar_paciente_social(db, 1, "atleta_joao", streak=5, xp=150)
 
 
 @pytest.fixture
 def paciente_b(db: Session) -> Paciente:
-    p = Paciente(id=2, username="maria_fit", streak=10, xp=300)
-    db.add(p)
-    db.commit()
-    db.refresh(p)
-    return p
+    return _criar_paciente_social(db, 2, "maria_fit", streak=10, xp=300)
 
 
 @pytest.fixture
 def paciente_c(db: Session) -> Paciente:
-    p = Paciente(id=3, username="carlos_runner", streak=2, xp=50)
-    db.add(p)
-    db.commit()
-    db.refresh(p)
-    return p
+    return _criar_paciente_social(db, 3, "carlos_runner", streak=2, xp=50)
 
 
 class TestSolicitacaoAmizade:

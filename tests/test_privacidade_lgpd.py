@@ -21,27 +21,25 @@ from app.models.historico_xp import HistoricoXP
 from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.schemas.privacidade import DesafioPublicoItem, RankingPublicoItem
+from tests import factories
 
 
 @pytest.fixture
 def paciente_com_dados_clinicos(db: Session) -> Paciente:
     """Paciente completo contendo triagem (peso, altura, idade, meta_kcal) e refeicoes privadas."""
-    paciente = Paciente(
-        id=77,
-        nome="Lucas Silva",
-        avatar="https://cdn.nutrivision.app/avatars/lucas.png",
-        username="lucas_fit",
-        streak=12,
-        xp=450,
-        peso_kg=Decimal("78.50"),
-        altura_cm=Decimal("176.00"),
-        idade=29,
-        genero="masculino",
-        nivel_atividade="moderado",
-        meta_kcal=Decimal("2350.00"),
-        origem_meta="harris_benedict",
-    )
-    db.add(paciente)
+    paciente = factories.criar_paciente(db, 77)
+    paciente.nome = "Lucas Silva"
+    paciente.avatar = "https://cdn.nutrivision.app/avatars/lucas.png"
+    paciente.username = "lucas_fit"
+    paciente.streak = 12
+    paciente.xp = 450
+    paciente.peso_kg = Decimal("78.50")
+    paciente.altura_cm = Decimal("176.00")
+    paciente.idade = 29
+    paciente.genero = "masculino"
+    paciente.nivel_atividade = "moderado"
+    paciente.meta_kcal = Decimal("2350.00")
+    paciente.origem_meta = "harris_benedict"
 
     # Registra refeicao com calorias detalhadas
     agora = datetime.now(UTC)
@@ -90,19 +88,16 @@ def paciente_com_dados_clinicos(db: Session) -> Paciente:
 @pytest.fixture
 def amigo_terceiro(db: Session, paciente_com_dados_clinicos: Paciente) -> Paciente:
     """Outro usuario (amigo/terceiro) que consulta o ranking ou desafio."""
-    amigo = Paciente(
-        id=88,
-        nome="Camila Souza",
-        avatar="https://cdn.nutrivision.app/avatars/camila.png",
-        username="camila_run",
-        streak=8,
-        xp=200,
-        peso_kg=Decimal("62.00"),
-        altura_cm=Decimal("165.00"),
-        idade=26,
-        meta_kcal=Decimal("1800.00"),
-    )
-    db.add(amigo)
+    amigo = factories.criar_paciente(db, 88)
+    amigo.nome = "Camila Souza"
+    amigo.avatar = "https://cdn.nutrivision.app/avatars/camila.png"
+    amigo.username = "camila_run"
+    amigo.streak = 8
+    amigo.xp = 200
+    amigo.peso_kg = Decimal("62.00")
+    amigo.altura_cm = Decimal("165.00")
+    amigo.idade = 26
+    amigo.meta_kcal = Decimal("1800.00")
 
     # Vinculo de amizade aceita
     amizade = Amizade(
@@ -201,9 +196,7 @@ class TestConformidadePrivacidadeEndpoints:
         amigo_terceiro: Paciente,
     ) -> None:
         """Ao consultar o ranking publico, o terceiro nao pode ter acesso a dados de saude."""
-        resp = client.get(
-            f"/api/v1/privacidade/ranking-publico?paciente_id={amigo_terceiro.id}"
-        )
+        resp = client.get(f"/api/v1/privacidade/ranking-publico?paciente_id={amigo_terceiro.id}")
         assert resp.status_code == 200
         dados = resp.json()
 
@@ -211,9 +204,7 @@ class TestConformidadePrivacidadeEndpoints:
         assert dados["total_participantes"] >= 2
 
         # Encontra o registro correspondente ao paciente com dados clinicos
-        item_lucas = next(
-            (it for it in dados["ranking"] if it["nome"] == "Lucas Silva"), None
-        )
+        item_lucas = next((it for it in dados["ranking"] if it["nome"] == "Lucas Silva"), None)
         assert item_lucas is not None
 
         # Verifica campos autorizados
@@ -253,9 +244,7 @@ class TestConformidadePrivacidadeEndpoints:
         amigo_terceiro: Paciente,
     ) -> None:
         """Alias /api/v1/gamificacao/ranking-publico segue a mesma conformidade LGPD."""
-        resp = client.get(
-            f"/api/v1/gamificacao/ranking-publico?paciente_id={amigo_terceiro.id}"
-        )
+        resp = client.get(f"/api/v1/gamificacao/ranking-publico?paciente_id={amigo_terceiro.id}")
         assert resp.status_code == 200
         item = resp.json()["ranking"][0]
         assert set(item.keys()) == {"nome", "avatar", "pontos", "streak"}
@@ -311,7 +300,10 @@ class TestConformidadePrivacidadeEndpoints:
         amigo_terceiro: Paciente,
     ) -> None:
         """Ao listar refeicoes como amigo_terceiro, nao traz refeicoes do paciente 77."""
-        resp = client.get(f"/api/v1/refeicoes?paciente_id={amigo_terceiro.id}")
+        resp = client.get(
+            f"/api/v1/refeicoes?paciente_id={amigo_terceiro.id}",
+            headers=factories.headers_de(amigo_terceiro.id),
+        )
         assert resp.status_code == 200
         refeicoes = resp.json()
 
