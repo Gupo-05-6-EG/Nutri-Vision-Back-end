@@ -24,10 +24,10 @@ PacienteId = Annotated[int, Path(gt=0, description="Id do paciente")]
     summary="Recebe a triagem e gera o teto calorico diario inicial (Harris-Benedict)",
 )
 def registrar_triagem(
-    paciente_id: PacienteId, dados: TriagemIn, db: DbSession, _acesso: AcessoPropriaConta
+    paciente_id: PacienteId, dados: TriagemIn, db: DbSession, paciente: AcessoPropriaConta
 ) -> TetoCaloricoOut:
     try:
-        resultado = servico.registrar_triagem(db, paciente_id, dados)
+        resultado = servico.registrar_triagem(db, paciente_id, dados, autor_id=paciente.id)
     except servico.PacienteNaoEncontrado:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Paciente nao encontrado") from None
     return TetoCaloricoOut.model_validate(resultado)
