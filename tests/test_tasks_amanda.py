@@ -44,6 +44,17 @@ def test_conquistas_permanentes_e_privadas(client, db):
     assert client.get("/api/v1/gamificacao/conquistas").status_code == 401
 
 
+def test_fechamento_preserva_marcos_anteriores_ao_primeiro_acesso(db):
+    paciente = criar_paciente(db, 1)
+    paciente.streak = 30
+    db.commit()
+
+    processar_gamificacao_diaria(db, date(2026, 11, 10))
+
+    assert paciente.streak == 0
+    assert {c.codigo for c in db.query(ConquistaPaciente).all()} == {"streak_7", "streak_30"}
+
+
 def test_vinculo_pendente_nao_autoriza_pdf(client, db):
     criar_paciente(db, 1)
     criar_nutricionista(db, 10)

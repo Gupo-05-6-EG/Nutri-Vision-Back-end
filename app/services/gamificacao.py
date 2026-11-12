@@ -50,6 +50,10 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
     ).scalars()
     processados = 0
     for paciente in pacientes:
+        # Preserva marcos ja atingidos antes da instalacao desta funcionalidade,
+        # mesmo se o fechamento de hoje encerrar a ofensiva anterior.
+        if paciente.streak >= 7:
+            avaliar_conquistas(db, paciente)
         quantidade, calorias = resultados.get(paciente.id, (0, Decimal(0)))
         cumpriu_meta = (
             paciente.meta_kcal is not None
