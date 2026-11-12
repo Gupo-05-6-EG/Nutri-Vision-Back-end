@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao
+from app.services.conquistas import avaliar_conquistas
 
 FUSO_HORARIO = ZoneInfo("America/Sao_Paulo")
 PERCENTUAL_MAXIMO_DA_META = Decimal("0.30")
@@ -40,10 +41,12 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
     }
 
     pacientes = db.execute(
-        select(Paciente).where(
+        select(Paciente)
+        .where(
             (Paciente.gamificacao_processada_em.is_(None))
             | (Paciente.gamificacao_processada_em < dia)
         )
+        .with_for_update()
     ).scalars()
     processados = 0
     for paciente in pacientes:
@@ -56,9 +59,12 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
         if cumpriu_meta:
             paciente.streak += 1
             paciente.xp += XP_POR_DIA
+        elif paciente.bloqueios_perda > 0 and paciente.streak > 0:
+            paciente.bloqueios_perda -= 1
         else:
             paciente.streak = 0
         paciente.gamificacao_processada_em = dia
+        avaliar_conquistas(db, paciente)
         processados += 1
 
     db.commit()

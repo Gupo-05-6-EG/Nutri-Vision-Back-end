@@ -67,6 +67,24 @@ def _gerar_codigo() -> str:
     return f"{randbelow(1_000_000):06d}"
 
 
+def nutricionista_vinculado(db: Session, nutricionista_id: int, paciente_id: int) -> bool:
+    """True se o nutricionista tem vinculo com o paciente (Task 1.6, RNF06).
+
+    Nao ha status no vinculo: quem resgatou o codigo tem vinculo ativo, e nao ha
+    fluxo de desvinculo ainda.
+    """
+    return (
+        db.execute(
+            select(Vinculo.id).where(
+                Vinculo.nutricionista_id == nutricionista_id,
+                Vinculo.paciente_id == paciente_id,
+                Vinculo.status == StatusVinculo.ATIVO.value,
+            )
+        ).first()
+        is not None
+    )
+
+
 def gerar_codigo_vinculacao(db: Session, usuario: Usuario) -> CodigoVinculacao:
     if usuario.perfil != Perfil.NUTRICIONISTA:
         raise PerfilIncompativel

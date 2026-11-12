@@ -6,8 +6,13 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models.alimento_personalizado import AlimentoPersonalizado
+from app.models.auditoria import Auditoria
+from app.models.conquista import ConquistaPaciente
 from app.models.consentimento import Consentimento
+from app.models.desafio import Desafio, ParticipanteDesafio
+from app.models.lembrete_refeicao import DispositivoPush, LembreteRefeicao
 from app.models.paciente import Paciente
+from app.models.plano_alimentar import PlanoAlimentar
 from app.models.refeicao import Refeicao
 from app.models.usuario import Perfil, Usuario
 from app.models.vinculo import Vinculo
@@ -87,6 +92,18 @@ def exportar_dados(db: Session, usuario: Usuario) -> dict[str, object]:
     if usuario.perfil == Perfil.PACIENTE:
         paciente = db.get(Paciente, usuario.id)
         dados["paciente"] = paciente
+        for chave, modelo in [
+            ("planos", PlanoAlimentar),
+            ("lembretes", LembreteRefeicao),
+            ("dispositivos", DispositivoPush),
+            ("conquistas", ConquistaPaciente),
+            ("participacoes_desafios", ParticipanteDesafio),
+            ("auditorias", Auditoria),
+        ]:
+            dados[chave] = db.scalars(select(modelo).where(modelo.paciente_id == usuario.id)).all()
+        dados["desafios_criados"] = db.scalars(
+            select(Desafio).where(Desafio.criador_id == usuario.id)
+        ).all()
         refeicoes = db.scalars(
             select(Refeicao)
             .where(Refeicao.paciente_id == usuario.id)

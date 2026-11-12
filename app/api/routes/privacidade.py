@@ -1,6 +1,7 @@
 """Endpoints de consentimento e direitos de privacidade do titular."""
 
 from fastapi import APIRouter, HTTPException, Response, status
+from fastapi.encoders import jsonable_encoder
 
 from app.api.deps import UsuarioAtual
 from app.db.deps import DbSession
@@ -51,7 +52,7 @@ def revogar_consentimento(usuario: UsuarioAtual, db: DbSession) -> Consentimento
 
 @router.get("/dados", summary="Exporta os dados pessoais do titular")
 def exportar_dados(usuario: UsuarioAtual, db: DbSession) -> dict[str, object]:
-    return servico.exportar_dados(db, usuario)
+    return jsonable_encoder(servico.exportar_dados(db, usuario))
 
 
 @router.delete("/conta", status_code=status.HTTP_204_NO_CONTENT)
