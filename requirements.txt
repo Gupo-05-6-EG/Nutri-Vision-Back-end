@@ -11,3 +11,4 @@ PyJWT==2.10.1
 email-validator==2.2.0
 firebase-admin==6.6.0
 cryptography==50.0.2
+reportlab==5.1.0
