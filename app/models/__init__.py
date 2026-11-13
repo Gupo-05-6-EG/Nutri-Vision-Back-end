@@ -8,6 +8,7 @@ from app.db.base import Base
 from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.alimento_taco import AlimentoTaco
 from app.models.auditoria import AcaoAuditoria, Auditoria, EntidadeAuditada
+from app.models.conquista import ConquistaPaciente
 from app.models.lembrete_refeicao import DispositivoPush, LembreteRefeicao
 from app.models.paciente import Genero, NivelAtividade, Paciente
 from app.models.plano_alimentar import AlimentoRefeicaoPlano, PlanoAlimentar, RefeicaoPlano
@@ -23,6 +24,7 @@ __all__ = [
     "Auditoria",
     "Base",
     "CodigoVinculacao",
+    "ConquistaPaciente",
     "DispositivoPush",
     "EntidadeAuditada",
     "Genero",
