@@ -4,7 +4,7 @@ from datetime import UTC, date, datetime, time
 from decimal import Decimal
 from zoneinfo import ZoneInfo
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models.paciente import Paciente
@@ -13,6 +13,20 @@ from app.models.refeicao import ItemRefeicao, Refeicao
 FUSO_HORARIO = ZoneInfo("America/Sao_Paulo")
 PERCENTUAL_MAXIMO_DA_META = Decimal("0.30")
 XP_POR_DIA = 50
+CUSTO_BLOQUEIO_XP = 100
+
+
+def resgatar_bloqueio(db: Session, paciente_id: int) -> Paciente | None:
+    """Debita XP e credita um bloqueio em uma única atualização."""
+    paciente = db.scalar(
+        update(Paciente)
+        .where(Paciente.id == paciente_id, Paciente.xp >= CUSTO_BLOQUEIO_XP)
+        .values(xp=Paciente.xp - CUSTO_BLOQUEIO_XP, bloqueios_perda=Paciente.bloqueios_perda + 1)
+        .returning(Paciente)
+    )
+    if paciente is not None:
+        db.commit()
+    return paciente
 
 
 def processar_gamificacao_diaria(db: Session, dia: date) -> int:
@@ -40,10 +54,13 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
     }
 
     pacientes = db.execute(
-        select(Paciente).where(
+        select(Paciente)
+        .where(
             (Paciente.gamificacao_processada_em.is_(None))
             | (Paciente.gamificacao_processada_em < dia)
         )
+        .order_by(Paciente.id)
+        .with_for_update()
     ).scalars()
     processados = 0
     for paciente in pacientes:
@@ -56,6 +73,8 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
         if cumpriu_meta:
             paciente.streak += 1
             paciente.xp += XP_POR_DIA
+        elif paciente.streak > 0 and paciente.bloqueios_perda > 0:
+            paciente.bloqueios_perda -= 1
         else:
             paciente.streak = 0
         paciente.gamificacao_processada_em = dia

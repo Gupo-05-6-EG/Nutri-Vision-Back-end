@@ -300,13 +300,16 @@ explicitamente para sobrepor a sugestão.
 | `streak` | int | dias consecutivos que cumpriram a regra diária (inicia em `0`) |
 | `xp` | int | pontos acumulados; cada dia válido soma `50` |
 | `gamificacao_processada_em` | date | último dia fechado, impede crédito duplicado |
+| `bloqueios_perda` | int | saldo de bloqueios, inicialmente zero |
 
 As colunas são opcionais porque o cadastro cria o paciente antes da triagem.
 
 `streak` e `xp` guardam, respectivamente, os dias consecutivos que cumpriram a
 regra de gamificação e os pontos acumulados. O fechamento diário considera as
 refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo de
-até 30% de `meta_kcal`, soma 1 ao streak e 50 XP; caso contrário, zera o streak.
+até 30% de `meta_kcal`, soma 1 ao streak e 50 XP. Quando a regra falha,
+consome um bloqueio se houver saldo e uma ofensiva ativa. Nesse caso, mantém
+o streak e o XP. Sem proteção, zera o streak.
 O fechamento não altera XP quando a regra não é cumprida. Pacientes sem meta
 calórica também não cumprem a regra.
 
@@ -322,6 +325,11 @@ o interpretador `.venv\Scripts\python.exe`, com argumento
 `-m scripts.processar_gamificacao` e diretório de trabalho na raiz do projeto.
 O campo `gamificacao_processada_em` impede crédito duplicado se o job for
 executado novamente no mesmo dia.
+
+O paciente autenticado pode consultar streak, XP, saldo e custo em
+`GET /api/v1/gamificacao`. Cada chamada a `POST /api/v1/gamificacao/bloqueios`
+troca 100 XP por um bloqueio e devolve o estado atualizado. A API responde
+com 409 se o saldo for insuficiente.
 
 ### `lembretes_refeicao` — horário de lembrete por refeição (RF26)
 

@@ -3,6 +3,7 @@
 from datetime import date, datetime, time
 from decimal import Decimal
 
+from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.paciente import Paciente
@@ -109,3 +110,52 @@ def test_rodar_duas_vezes_no_mesmo_dia_nao_credita_de_novo(db: Session) -> None:
 
     assert paciente.streak == 1
     assert paciente.xp == XP_POR_DIA
+
+
+def test_resgate_e_consumo_no_fechamento(client: TestClient, db: Session) -> None:
+    paciente = _paciente(db)
+    paciente.streak, paciente.xp = 3, 100
+    db.commit()
+    headers = factories.headers_de(paciente.id)
+    url = "/api/v1/gamificacao"
+
+    compra = client.post(f"{url}/bloqueios", headers=headers)
+    assert compra.status_code == 200
+    assert compra.json() == {"streak": 3, "xp": 0, "bloqueios_perda": 1, "custo_bloqueio_xp": 100}
+    assert client.post(f"{url}/bloqueios", headers=headers).status_code == 409
+    assert client.get(url, headers=headers).json() == compra.json()
+
+    assert processar_gamificacao_diaria(db, DIA) == 1
+    assert processar_gamificacao_diaria(db, DIA) == 0
+    assert (paciente.streak, paciente.xp, paciente.bloqueios_perda) == (3, 0, 0)
+
+
+def test_dia_valido_nao_consume_bloqueio(db: Session) -> None:
+    paciente = _paciente(db)
+    paciente.streak, paciente.bloqueios_perda = 2, 1
+    db.commit()
+    _refeicao(db, 1, 8, "100")
+    _refeicao(db, 1, 12, "100")
+
+    processar_gamificacao_diaria(db, DIA)
+
+    assert (paciente.streak, paciente.xp, paciente.bloqueios_perda) == (3, XP_POR_DIA, 1)
+
+
+def test_falha_sem_ofensiva_nao_consome_bloqueio(db: Session) -> None:
+    paciente = _paciente(db)
+    paciente.bloqueios_perda = 1
+    db.commit()
+
+    processar_gamificacao_diaria(db, DIA)
+
+    assert (paciente.streak, paciente.xp, paciente.bloqueios_perda) == (0, 0, 1)
+
+
+def test_resgate_exige_paciente_autenticado(client: TestClient, db: Session) -> None:
+    nutri = factories.criar_nutricionista(db, 2)
+    url = "/api/v1/gamificacao/bloqueios"
+    assert client.post(url).status_code == 401
+    assert (
+        client.post(url, headers=factories.headers_de(nutri.id, "nutricionista")).status_code == 403
+    )
