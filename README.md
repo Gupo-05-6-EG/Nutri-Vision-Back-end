@@ -323,6 +323,14 @@ o interpretador `.venv\Scripts\python.exe`, com argumento
 O campo `gamificacao_processada_em` impede crédito duplicado se o job for
 executado novamente no mesmo dia.
 
+No fechamento, o job concede as conquistas de 30 dias de ofensiva e 100
+refeições registradas. A conquista fica registrada mesmo se a ofensiva cair
+ou refeições forem excluídas depois.
+
+`GET /api/v1/gamificacao/conquistas` retorna o catálogo e o progresso do
+paciente autenticado. Cada item tem `codigo`, `nome`, `meta`, `progresso`
+e `obtida_em`. A data é nula até que o fechamento conceda a conquista.
+
 ### `lembretes_refeicao` — horário de lembrete por refeição (RF26)
 
 | Coluna | Tipo | Observação |
