@@ -5,12 +5,24 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from app.models.refeicao import TipoRefeicao
 from app.services.refeicoes import sugerir_tipo
 from tests import factories
 
 ROTA = "/api/v1/refeicoes"
+
+
+@pytest.fixture(autouse=True)
+def _paciente(db: Session) -> None:
+    factories.criar_paciente(db, 1)
+
+
+@pytest.fixture(autouse=True)
+def _logado_como_paciente_1(client: TestClient) -> None:
+    """Por padrao as requisicoes saem autenticadas como o paciente 1 (Task 1.6)."""
+    client.headers.update(factories.headers_de(1))
 
 
 def _criar(client: TestClient, **kwargs: Any) -> dict[str, Any]:

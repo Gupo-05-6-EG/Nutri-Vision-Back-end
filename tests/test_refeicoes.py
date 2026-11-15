@@ -1,20 +1,43 @@
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy.orm import Session
 
 from tests import factories
 
 ROTA = "/api/v1/refeicoes"
 
 
+@pytest.fixture(autouse=True)
+def _pacientes(db: Session) -> None:
+    factories.criar_paciente(db, 1)
+    factories.criar_paciente(db, 2)
+
+
+@pytest.fixture(autouse=True)
+def _logado_como_paciente_1(client: TestClient) -> None:
+    """Por padrao as requisicoes saem autenticadas como o paciente 1 (Task 1.6)."""
+    client.headers.update(factories.headers_de(1))
+
+
 def _criar(client: TestClient, **kwargs: Any) -> dict[str, Any]:
-    resposta = client.post(ROTA, json=factories.refeicao(**kwargs))
+    # Quem registra e sempre o proprio paciente dono da refeicao.
+    headers = factories.headers_de(kwargs.get("paciente_id", 1))
+    resposta = client.post(ROTA, json=factories.refeicao(**kwargs), headers=headers)
     assert resposta.status_code == 201, resposta.text
     return resposta.json()
 
 
 class TestRegistro:
+    def test_recusa_paciente_inexistente(self, client: TestClient) -> None:
+        # Ninguem e o paciente 999, entao cai no controle de acesso (403) e a API
+        # nao revela se o id existe.
+        resposta = client.post(ROTA, json=factories.refeicao(paciente_id=999))
+
+        assert resposta.status_code == 403
+
     def test_registra_refeicao_com_itens(self, client: TestClient) -> None:
         corpo = _criar(client, observacao="Almoco em casa")
 
@@ -212,7 +235,11 @@ class TestConsumoDiario:
         _criar(client, paciente_id=1, consumida_em=dia)
         _criar(client, paciente_id=2, consumida_em=dia)
 
-        corpo = client.get(self.ROTA_DIARIO, params={"paciente_id": 2, "data": "2026-09-19"}).json()
+        corpo = client.get(
+            self.ROTA_DIARIO,
+            params={"paciente_id": 2, "data": "2026-09-19"},
+            headers=factories.headers_de(2),
+        ).json()
 
         assert corpo["quantidade_refeicoes"] == 1
         assert corpo["refeicoes"][0]["paciente_id"] == 2

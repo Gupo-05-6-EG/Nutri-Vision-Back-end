@@ -2,12 +2,21 @@
 
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.alimento_taco import AlimentoTaco
+from tests import factories
 
 ROTA = "/api/v1/alimentos-taco"
+
+
+@pytest.fixture(autouse=True)
+def _logado(client: TestClient, db: Session) -> None:
+    """A API exige token de qualquer perfil (Task 1.6): entra como o paciente 1."""
+    factories.criar_paciente(db, 1)
+    client.headers.update(factories.headers_de(1))
 
 
 def _alimento(nome: str, categoria: str = "Cereais e derivados") -> AlimentoTaco:

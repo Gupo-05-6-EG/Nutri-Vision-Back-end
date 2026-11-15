@@ -5,7 +5,6 @@ outras tasks entram por migration depois:
 
 - estimativa da IA vs valor confirmado no item -> Task 2.7 (RF23)
 - `alimento_id` apontando para a tabela TACO -> Task 2.2 (RF02.2)
-- FK de `paciente_id` para a tabela de usuarios -> Task 1.2 (RF13)
 """
 
 from datetime import datetime
@@ -24,6 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.crypto import TextoCifrado
 from app.db.base import Base
 
 CAMPOS_NUTRICIONAIS = ("calorias_kcal", "proteinas_g", "carboidratos_g", "gorduras_g")
@@ -54,9 +54,9 @@ class Refeicao(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
 
-    # Sem FK ainda: a tabela de usuarios nasce na Task 1.2, que adiciona a
-    # constraint por migration.
-    paciente_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    paciente_id: Mapped[int] = mapped_column(
+        ForeignKey("pacientes.id", ondelete="CASCADE"), nullable=False, index=True
+    )
 
     consumida_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
@@ -65,7 +65,8 @@ class Refeicao(Base):
     # (ver `sugerir_tipo` em app/services/refeicoes.py).
     tipo: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Texto livre do paciente, pode citar saude: gravado cifrado (Task 1.6).
+    observacao: Mapped[str | None] = mapped_column(TextoCifrado, nullable=True)
 
     criada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

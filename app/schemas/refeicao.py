@@ -79,8 +79,7 @@ class TotaisNutricionais(BaseModel):
 
 
 class RefeicaoCreate(BaseModel):
-    # Vem no corpo enquanto nao existe autenticacao; a Task 1.2 substitui isto
-    # pelo paciente do token e a Task 1.6 aplica o controle de acesso.
+    # Ainda vem no corpo; a Task 1.6 (RNF06) passa a conferir contra o token.
     paciente_id: int = Field(gt=0)
     consumida_em: datetime
     # Cafe da manha, almoco, lanche ou jantar (RF19). Se omitido, o service
