@@ -191,8 +191,25 @@ O [`docker-compose.prod.yml`](docker-compose.prod.yml) sobrepõe o de desenvolvi
 
 **Health checks.** `GET /api/v1/health` (liveness: o processo responde) e
 `GET /api/v1/health/db` (readiness: o banco responde, senão `503`). Para monitorar o
-uptime, aponte um monitor externo (UptimeRobot, Better Stack, Uptime Kuma...) para
-`/api/v1/health/db`, com alerta por email/Telegram após 2 falhas seguidas.
+uptime há o workflow [`uptime.yml`](.github/workflows/uptime.yml): a cada 15 minutos ele
+chama `/api/v1/health/db` na URL da variável de repositório `UPTIME_URL` (Settings →
+Secrets and variables → Actions → Variables). Depois de 3 tentativas falhas, abre uma
+issue com a label `uptime` (ou comenta na aberta), e fecha a issue quando a API volta.
+Sem `UPTIME_URL` ele só registra um aviso. Um monitor externo (UptimeRobot, Better
+Stack...) pode ser somado a ele para alertas por Telegram ou SMS.
+
+**Imagem para o deploy.** O workflow [`imagem.yml`](.github/workflows/imagem.yml)
+publica a imagem no GitHub Container Registry a cada push na `main` (tags `latest` e
+`sha-<commit>`) e em tags `v*`. No servidor, basta trocar o `build` pela imagem:
+
+```bash
+docker pull ghcr.io/gupo-05-6-eg/nutri-vision-back-end:latest
+```
+
+**Fila de inferência.** A análise de fotos é desacoplada no
+[Nutri-Vision-IA](https://github.com/Gupo-05-6-EG/Nutri-Vision-IA): a API da IA
+enfileira cada foto no Redis (RQ), e o serviço `worker` processa a fila. Para escalar,
+suba mais workers com `docker compose up -d --scale worker=N`.
 
 **Logs e rastreio.** Toda resposta traz `X-Request-ID` (o do cliente, se vier, ou um
 gerado). Esse id aparece em todas as linhas de log da requisição. Cada requisição gera
@@ -218,12 +235,16 @@ ruff format .               # formatação
 ## CI/CD (RNF08)
 
 O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda em todo push e
-pull request para `main`/`develop`, com quatro jobs:
+pull request para `main`/`dev`, com cinco jobs:
 
 1. **lint** — `ruff check` + `ruff format --check`
 2. **test** — `pytest` com cobertura
 3. **migrations** — `alembic upgrade head` + `alembic check` contra um Postgres real
-4. **docker** — build da imagem e validação do `/health` no container
+4. **backup** — backup, retenção e teste de restauração contra um Postgres real
+5. **docker** — build da imagem e validação do `/health` no container
+
+Além dele, [`imagem.yml`](.github/workflows/imagem.yml) publica a imagem no GHCR e
+[`uptime.yml`](.github/workflows/uptime.yml) monitora a API publicada.
 
 ## Modelo de dados
 
