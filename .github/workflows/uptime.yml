@@ -1,0 +1,77 @@
+name: Monitor de uptime
+
+# Task 7.1 (RNF09): verifica a cada 15 minutos o readiness da API publicada
+# (`/api/v1/health/db`). Depois de 3 tentativas falhas abre uma issue com a
+# label `uptime` (ou comenta na que ja esta aberta), e fecha a issue quando a
+# API volta. Quem acompanha o repositorio recebe o aviso por email.
+#
+# Configuracao: Settings > Secrets and variables > Actions > Variables >
+# `UPTIME_URL` com a URL base da API (ex.: https://api.nutrivision.app).
+# Sem a variavel o workflow so avisa e termina, sem falhar.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: uptime
+  cancel-in-progress: false
+
+jobs:
+  verificar:
+    name: Readiness da API
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      UPTIME_URL: ${{ vars.UPTIME_URL }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GH_REPO: ${{ github.repository }}
+      TITULO: "API fora do ar (monitor de uptime)"
+    steps:
+      - name: Checa o /health/db
+        id: checa
+        run: |
+          if [ -z "$UPTIME_URL" ]; then
+            echo "::notice::Variavel UPTIME_URL nao configurada; nada a monitorar."
+            echo "estado=sem_url" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          alvo="${UPTIME_URL%/}/api/v1/health/db"
+          for i in 1 2 3; do
+            codigo=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$alvo" || true)
+            echo "tentativa $i: HTTP $codigo"
+            if [ "$codigo" = "200" ]; then
+              echo "estado=ok" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "estado=fora" >> "$GITHUB_OUTPUT"
+          echo "codigo=$codigo" >> "$GITHUB_OUTPUT"
+          echo "alvo=$alvo" >> "$GITHUB_OUTPUT"
+
+      - name: Abre ou atualiza a issue de indisponibilidade
+        if: steps.checa.outputs.estado == 'fora'
+        run: |
+          gh label create uptime --color B60205 --description "Alerta do monitor de uptime" 2>/dev/null || true
+          agora=$(date -u '+%Y-%m-%d %H:%M UTC')
+          msg="Falha em $agora: \`${{ steps.checa.outputs.alvo }}\` respondeu HTTP ${{ steps.checa.outputs.codigo }} nas 3 tentativas. [Execucao](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+          aberta=$(gh issue list --label uptime --state open --json number --jq '.[0].number')
+          if [ -n "$aberta" ]; then
+            gh issue comment "$aberta" --body "$msg"
+          else
+            gh issue create --title "$TITULO" --label uptime --body "$msg"
+          fi
+          exit 1
+
+      - name: Fecha a issue quando a API volta
+        if: steps.checa.outputs.estado == 'ok'
+        run: |
+          aberta=$(gh issue list --label uptime --state open --json number --jq '.[0].number')
+          if [ -n "$aberta" ]; then
+            gh issue close "$aberta" --comment "API respondeu 200 em $(date -u '+%Y-%m-%d %H:%M UTC'). Fechando."
+          fi
