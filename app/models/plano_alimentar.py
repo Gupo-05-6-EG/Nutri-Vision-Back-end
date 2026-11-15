@@ -3,8 +3,9 @@
 Um plano e uma lista de blocos de refeicao (cafe da manha, lanche da tarde,
 ceia, ...), cada um com metas de kcal e proteinas e os alimentos indicados.
 
-Cada paciente tem no maximo um plano ativo: prescrever um novo desativa o
-anterior. O historico de versoes com auditoria fica para a Task 5.3 (RF08).
+Cada paciente tem no maximo um plano ativo: prescrever (ou editar) um plano cria
+uma versao nova e desativa a anterior (Task 5.3, RF08). As versoes antigas ficam
+no banco, intactas, e a trilha de quem mudou o que fica em `auditorias`.
 """
 
 from datetime import datetime, time
@@ -20,6 +21,7 @@ from sqlalchemy import (
     Numeric,
     String,
     Time,
+    UniqueConstraint,
     func,
     true,
 )
@@ -32,7 +34,10 @@ class PlanoAlimentar(Base):
     """Plano alimentar de um paciente, com seus blocos de refeicao."""
 
     __tablename__ = "planos_alimentares"
-    __table_args__ = (Index("ix_planos_alimentares_paciente_ativo", "paciente_id", "ativo"),)
+    __table_args__ = (
+        Index("ix_planos_alimentares_paciente_ativo", "paciente_id", "ativo"),
+        UniqueConstraint("paciente_id", "versao", name="uq_planos_alimentares_paciente_id_versao"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     paciente_id: Mapped[int] = mapped_column(
@@ -43,6 +48,8 @@ class PlanoAlimentar(Base):
     nutricionista_id: Mapped[int | None] = mapped_column(
         ForeignKey("nutricionistas.id", ondelete="SET NULL"), nullable=True
     )
+    # Numero sequencial por paciente: 1 = primeiro plano, 2 = primeira edicao, ...
+    versao: Mapped[int] = mapped_column(Integer, nullable=False)
     titulo: Mapped[str] = mapped_column(String(120), nullable=False)
     observacao: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     ativo: Mapped[bool] = mapped_column(

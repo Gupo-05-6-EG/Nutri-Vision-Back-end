@@ -3,7 +3,7 @@
 Task 4.3 [Back] - Sistema Social e Leaderboard (RF05).
 
 Revision ID: 8f2c3d1e9a4b
-Revises: a8e2f4c61b07
+Revises: c4d9e1f6a2b3
 Create Date: 2026-10-26 20:00:00.000000
 
 """
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "8f2c3d1e9a4b"
-down_revision: str | None = "a8e2f4c61b07"
+down_revision: str | None = "c4d9e1f6a2b3"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

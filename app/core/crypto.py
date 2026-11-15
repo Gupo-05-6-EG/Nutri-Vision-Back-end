@@ -1,9 +1,10 @@
 """Criptografia de dados sensiveis em repouso (Task 1.6, RNF06).
 
-Os dados de saude do paciente (triagem e observacao das refeicoes) sao gravados
-cifrados com Fernet (AES-128-CBC + HMAC-SHA256, da lib `cryptography`). A cifra e
-a decifragem acontecem nos tipos de coluna abaixo, entao o resto do codigo segue
-lendo e gravando `Decimal`, `int` e `str` normalmente.
+Os dados de saude do paciente (triagem, observacao das refeicoes e os valores
+antes/depois da auditoria) sao gravados cifrados com Fernet (AES-128-CBC +
+HMAC-SHA256, da lib `cryptography`). A cifra e a decifragem acontecem nos tipos
+de coluna abaixo, entao o resto do codigo segue lendo e gravando `Decimal`, `int`
+e `str` normalmente.
 
 Consequencia: o banco guarda texto opaco, entao nao da para filtrar, ordenar ou
 somar essas colunas em SQL. Nenhuma query faz isso hoje; se precisar, a conta
@@ -12,6 +13,7 @@ tem que ser feita em Python.
 A chave vem de `ENCRYPTION_KEY`. Perder a chave = perder os dados cifrados.
 """
 
+import json
 from collections.abc import Callable
 from decimal import Decimal
 from functools import lru_cache
@@ -82,3 +84,14 @@ class DecimalCifrado(_ColunaCifrada):
     """`Decimal` cifrado (guardado como texto, sem perder casas decimais)."""
 
     de_texto = staticmethod(Decimal)
+
+
+def _json_para_texto(valor: Any) -> str:
+    return json.dumps(valor, ensure_ascii=False, sort_keys=True, default=str)
+
+
+class JsonCifrado(_ColunaCifrada):
+    """Estrutura JSON (dict ou lista) cifrada; usada nos valores antes/depois da auditoria."""
+
+    para_texto = staticmethod(_json_para_texto)
+    de_texto = staticmethod(json.loads)
