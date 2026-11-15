@@ -48,4 +48,3 @@ class NotificacaoDesafio(Base):
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
-

@@ -128,3 +128,24 @@ class TestChave:
 
         with pytest.raises(crypto.ErroDeCriptografia):
             crypto.decifrar(adulterado)
+
+
+class TestJsonCifrado:
+    """Tipo de coluna dos valores antes/depois da auditoria (Task 5.3)."""
+
+    def test_ida_e_volta_preserva_a_estrutura(self) -> None:
+        tipo = crypto.JsonCifrado()
+        valor = {"titulo": "Plano \u00e1gil", "metas": [600.5, 40], "obs": None}
+
+        guardado = tipo.process_bind_param(valor, dialect=None)  # type: ignore[arg-type]
+
+        assert guardado is not None
+        assert guardado.startswith(PREFIXO_FERNET)
+        assert "Plano" not in guardado
+        assert tipo.process_result_value(guardado, dialect=None) == valor  # type: ignore[arg-type]
+
+    def test_nulo_continua_nulo(self) -> None:
+        tipo = crypto.JsonCifrado()
+
+        assert tipo.process_bind_param(None, dialect=None) is None  # type: ignore[arg-type]
+        assert tipo.process_result_value(None, dialect=None) is None  # type: ignore[arg-type]
