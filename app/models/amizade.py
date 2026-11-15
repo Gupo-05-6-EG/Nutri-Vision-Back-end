@@ -35,7 +35,7 @@ class Amizade(Base):
     __tablename__ = "amizades"
     __table_args__ = (
         CheckConstraint("pac_id != amigo_id", name="nao_auto_amizade"),
-        UniqueConstraint("pac_id", "amigo_id", name="uq_amizades_pac_amigo"),
+        UniqueConstraint("pac_id", "amigo_id"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
