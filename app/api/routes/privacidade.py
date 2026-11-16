@@ -1,23 +1,75 @@
-"""Endpoints de Privacidade e Conformidade LGPD (Item 51 - RF29, RNF06, RNF07).
-
-Rotas publicas para exibicao de rankings e desafios onde dados de saude
-sao estritamente omitidos e isolados, retornando unicamente:
-- nome
-- avatar
-- pontos
-- streak
+"""Endpoints de privacidade (LGPD): consentimento e direitos do titular (RF28, RNF07) e
+rankings/desafios publicos que expoem apenas nome, avatar, pontos e streak (RF29, RNF06).
 """
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path, Query, status
+from fastapi import APIRouter, HTTPException, Path, Query, Response, status
 
+from app.api.deps import UsuarioAtual
 from app.db.deps import DbSession
-from app.schemas.privacidade import DesafioPublicoOut, RankingPublicoOut
+from app.models.consentimento import Consentimento
+from app.schemas.privacidade import (
+    ConsentimentoIn,
+    ConsentimentoOut,
+    ConsentimentoStatusOut,
+    DesafioPublicoOut,
+    RankingPublicoOut,
+)
 from app.services import gamificacao as gamificacao_servico
 from app.services import privacidade as servico
 
 router = APIRouter(prefix="/privacidade", tags=["privacidade"])
+
+
+def _consentimento_out(item: Consentimento) -> ConsentimentoOut:
+    return ConsentimentoOut(
+        versao_termo=item.versao_termo,
+        aceito_em=item.aceito_em,
+        revogado_em=item.revogado_em,
+    )
+
+
+@router.get("/consentimento", response_model=ConsentimentoStatusOut)
+def obter_consentimento(usuario: UsuarioAtual, db: DbSession) -> ConsentimentoStatusOut:
+    itens = servico.listar_consentimentos(db, usuario.id)
+    return ConsentimentoStatusOut(
+        consentimentos=[_consentimento_out(item) for item in itens],
+        consentimento_ativo=bool(itens and itens[-1].revogado_em is None),
+    )
+
+
+@router.post(
+    "/consentimento",
+    response_model=ConsentimentoOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Registra o aceite de uma versao do termo",
+)
+def aceitar_consentimento(
+    dados: ConsentimentoIn, usuario: UsuarioAtual, db: DbSession
+) -> ConsentimentoOut:
+    item = servico.registrar_consentimento(db, usuario.id, dados.versao_termo.strip())
+    return _consentimento_out(item)
+
+
+@router.post("/consentimento/revogar", response_model=ConsentimentoOut)
+def revogar_consentimento(usuario: UsuarioAtual, db: DbSession) -> ConsentimentoOut:
+    item = servico.revogar_consentimento(db, usuario.id)
+    if item is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nenhum consentimento ativo")
+    return _consentimento_out(item)
+
+
+@router.get("/dados", summary="Exporta os dados pessoais do titular")
+def exportar_dados(usuario: UsuarioAtual, db: DbSession) -> dict[str, object]:
+    return servico.exportar_dados(db, usuario)
+
+
+@router.delete("/conta", status_code=status.HTTP_204_NO_CONTENT)
+def excluir_conta(usuario: UsuarioAtual, db: DbSession) -> Response:
+    servico.excluir_conta(db, usuario)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
 
 PacienteId = Annotated[int, Query(gt=0, description="Id do paciente solicitante")]
 DesafioId = Annotated[int, Path(gt=0, description="Id do desafio")]

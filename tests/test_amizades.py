@@ -8,10 +8,8 @@ from app.models.paciente import Paciente
 from tests import factories
 
 
-def _criar_paciente_social(
-    db: Session, paciente_id: int, username: str, streak: int, xp: int
-) -> Paciente:
-    p = factories.criar_paciente(db, paciente_id)
+def _criar_paciente_social(db: Session, pid: int, username: str, streak: int, xp: int) -> Paciente:
+    p = factories.criar_paciente(db, pid)
     p.username = username
     p.streak = streak
     p.xp = xp

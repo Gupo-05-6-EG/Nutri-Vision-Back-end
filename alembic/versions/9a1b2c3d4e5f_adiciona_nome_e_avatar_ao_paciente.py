@@ -3,7 +3,7 @@
 Modulo: Privacidade e Conformidade (LGPD) - Item 51 (RF29).
 
 Revision ID: 9a1b2c3d4e5f
-Revises: 8f2c3d1e9a4b
+Revises: 7c46f031ab29
 Create Date: 2026-10-26 21:15:00.000000
 
 """
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "9a1b2c3d4e5f"
-down_revision: str | None = "8f2c3d1e9a4b"
+down_revision: str | None = "7c46f031ab29"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

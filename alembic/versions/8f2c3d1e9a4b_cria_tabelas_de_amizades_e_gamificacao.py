@@ -1,4 +1,4 @@
-"""cria tabelas de amizades e historico de xp
+"""cria tabelas de amizades e gamificacao
 
 Task 4.3 [Back] - Sistema Social e Leaderboard (RF05).
 
@@ -21,7 +21,6 @@ depends_on: str | Sequence[str] | None = None
 
 def upgrade() -> None:
     # 1. Amplia a tabela de pacientes com campo de identidade social (DER 3.3, RF05)
-    # Obs: streak e xp ja foram criados em b7c8d9e0f123 (Task 4.1)
     op.add_column("pacientes", sa.Column("username", sa.String(length=50), nullable=True))
     op.create_index(op.f("ix_pacientes_username"), "pacientes", ["username"], unique=True)
 

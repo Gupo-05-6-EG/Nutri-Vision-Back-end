@@ -77,6 +77,28 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+## Desafios entre amigos (RF05.2, RF05.3)
+
+Depois de aplicar as migrations, pacientes autenticados podem criar desafios e
+convidar outros pacientes pelo ID. O convite precisa ser aceito para a pessoa
+entrar no placar. Tipos aceitos: `refeicoes` (dias em que as quatro categorias
+de refeição foram registradas), `variacao_calorica` (menor média de diferença absoluta entre o
+consumo diário e a meta calórica) e `sequencia_meta` (maior sequência de dias
+com pelo menos duas refeições e consumo até 30% da meta, seguindo o critério
+do processamento diário de gamificação). A variação calórica inclui dias sem
+registro como consumo zero. As datas são enviadas com fuso horário.
+
+- `POST /api/v1/challenges`: cria desafio; corpo: `nome`, `tipo`, `regra`,
+  `inicio_em`, `fim_em` e `convidados` (lista de IDs de pacientes, opcional).
+- `POST /api/v1/challenges/{id}/invites`: convida mais pacientes; corpo:
+  `pacientes` (lista de IDs).
+- `POST /api/v1/challenges/{id}/response`: aceita ou recusa; corpo:
+  `aceitar` (booleano).
+- `GET /api/v1/challenges`: lista desafios dos quais o usuário participa ou
+  para os quais foi convidado, com seu status.
+- `GET /api/v1/challenges/{id}/leaderboard`: retorna posições e pontuações;
+  apenas participantes que aceitaram o convite podem consultar o placar.
+
 ## Populando a TACO
 
 Depois das migrations (`alembic upgrade head`), importe a Tabela Brasileira de
@@ -321,13 +343,16 @@ explicitamente para sobrepor a sugestão.
 | `streak` | int | dias consecutivos que cumpriram a regra diária (inicia em `0`) |
 | `xp` | int | pontos acumulados; cada dia válido soma `50` |
 | `gamificacao_processada_em` | date | último dia fechado, impede crédito duplicado |
+| `bloqueios_perda` | int | saldo de bloqueios, inicialmente zero |
 
 As colunas são opcionais porque o cadastro cria o paciente antes da triagem.
 
 `streak` e `xp` guardam, respectivamente, os dias consecutivos que cumpriram a
 regra de gamificação e os pontos acumulados. O fechamento diário considera as
 refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo de
-até 30% de `meta_kcal`, soma 1 ao streak e 50 XP; caso contrário, zera o streak.
+até 30% de `meta_kcal`, soma 1 ao streak e 50 XP. Quando a regra falha,
+consome um bloqueio se houver saldo e uma ofensiva ativa. Nesse caso, mantém
+o streak e o XP. Sem proteção, zera o streak.
 O fechamento não altera XP quando a regra não é cumprida. Pacientes sem meta
 calórica também não cumprem a regra.
 
@@ -343,6 +368,18 @@ o interpretador `.venv\Scripts\python.exe`, com argumento
 `-m scripts.processar_gamificacao` e diretório de trabalho na raiz do projeto.
 O campo `gamificacao_processada_em` impede crédito duplicado se o job for
 executado novamente no mesmo dia.
+
+No fechamento, o job concede as conquistas de 30 dias de ofensiva e 100
+refeições registradas. A conquista fica registrada mesmo se a ofensiva cair
+ou refeições forem excluídas depois.
+
+`GET /api/v1/gamificacao/conquistas` retorna o catálogo e o progresso do
+paciente autenticado. Cada item tem `codigo`, `nome`, `meta`, `progresso`
+e `obtida_em`. A data é nula até que o fechamento conceda a conquista.
+O paciente autenticado pode consultar streak, XP, saldo e custo em
+`GET /api/v1/gamificacao`. Cada chamada a `POST /api/v1/gamificacao/bloqueios`
+troca 100 XP por um bloqueio e devolve o estado atualizado. A API responde
+com 409 se o saldo for insuficiente.
 
 ### `lembretes_refeicao` — horário de lembrete por refeição (RF26)
 
@@ -497,7 +534,11 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | POST | `/api/v1/auth/login` | Login com email e senha (RF13) |
 | GET | `/api/v1/auth/me` | Usuário do token (🔒 Bearer) |
 | POST | `/api/v1/linking-code` | Gera um codigo de vinculacao de 6 digitos para o nutricionista autenticado |
-| POST | `/api/v1/link` | Resgata um codigo de vinculacao e cria o vinculo paciente-nutricionista |
+| POST | `/api/v1/link` | Paciente resgata um codigo e cria uma solicitacao pendente |
+| POST | `/api/v1/link/{nutricionista_id}/aceitar` | Paciente aceita a solicitacao de vinculo |
+| POST | `/api/v1/link/{nutricionista_id}/recusar` | Paciente recusa a solicitacao de vinculo |
+| GET | `/api/v1/patients?busca=` | Nutricionista lista pacientes ativos com busca opcional por nome |
+| DELETE | `/api/v1/patients/{paciente_id}` | Nutricionista encerra o vinculo ativo |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
 | GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
@@ -505,6 +546,11 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
+| GET | `/api/v1/privacidade/consentimento` | Consulta o histórico e o estado do consentimento (RF28, RNF07) |
+| POST | `/api/v1/privacidade/consentimento` | Registra aceite de uma versão do termo (RF28, RNF07) |
+| POST | `/api/v1/privacidade/consentimento/revogar` | Revoga o consentimento ativo |
+| GET | `/api/v1/privacidade/dados` | Exporta os dados da conta autenticada |
+| DELETE | `/api/v1/privacidade/conta` | Exclui a conta e os dados pessoais associados |
 | POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve ou edita o plano: salva uma versão nova e a torna a ativa (🔒 nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (🔒 nutricionista vinculado ou o próprio paciente) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/versoes` | Histórico de versões do plano, da mais nova para a mais antiga (RF08, 🔒 nutricionista vinculado) |
@@ -533,6 +579,12 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 > triagem ainda não exigem token: a Task 1.6 (RNF06) passa a exigir e a validar se
 > quem chama é o próprio paciente ou um nutricionista vinculado. O `paciente_id`
 > precisa ser de um paciente cadastrado (senão `422` em refeições e `404` na triagem).
+
+### Privacidade e direitos do titular (RF28, RNF07)
+
+Todas as rotas de privacidade exigem autenticação e operam somente sobre a conta do token. O aceite recebe `{"versao_termo": "1.0"}` e grava a versão e o instante; o histórico pode ser consultado e a revogação registra seu instante sem apagar o aceite anterior. Repetir o aceite da mesma versão enquanto ativo é idempotente.
+
+`GET /api/v1/privacidade/dados` exporta o perfil, consentimentos e registros relacionados à conta (triagem, refeições e itens, alimentos personalizados e vínculos, conforme o perfil). `DELETE /api/v1/privacidade/conta` exclui a conta autenticada; os dados vinculados são removidos pelas chaves estrangeiras em cascata e os alimentos personalizados do paciente são removidos explicitamente. A exclusão é permanente e responde `204`.
 
 ### Autenticação (RF13)
 
@@ -693,6 +745,8 @@ Permite o vínculo entre paciente e nutricionista por meio de um código tempor�
 
 - `POST /api/v1/linking-code`: Exige autenticação de nutricionista (`Authorization: Bearer <token>`). Gera um código numérico de 6 dígitos que expira conforme `LINKING_CODE_EXPIRE_MINUTES`.
 - `POST /api/v1/link`: Exige autenticação de paciente. Recebe `{"codigo": "123456"}` e cria o vínculo de forma atômica e idempotente.
+
+Depois de resgatar o codigo, o paciente pode chamar `POST /api/v1/link/{nutricionista_id}/aceitar` ou `/recusar`. O status fica `pendente` ate a resposta; as transicoes finais sao `ativo` ou `recusado`. A rota `GET /api/v1/patients?busca=` lista os vinculos ativos do nutricionista autenticado, e `DELETE /api/v1/patients/{paciente_id}` os encerra com status `encerrado`. Vínculos existentes antes da migration `d4e5f6a7b890` sao preservados como `ativo`.
 
 **Comportamento de erro e respostas HTTP:**
 - `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, `sub` ausente ou inválido, ou usuário inexistente.

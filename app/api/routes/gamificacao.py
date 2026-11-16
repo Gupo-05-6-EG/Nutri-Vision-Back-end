@@ -1,10 +1,15 @@
-"""Endpoints de Gamificacao e Leaderboard Semanal (RF05, RF16, RF29)."""
+"""Endpoints de Gamificacao: ofensiva e resgate de bloqueio (RF17) e Leaderboard Semanal
+(RF05, RF16, RF29)."""
 
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Path, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
+from pydantic import BaseModel, ConfigDict
 
+from app.api.deps import exigir_perfil
 from app.db.deps import DbSession
+from app.models.paciente import Paciente
+from app.models.usuario import Perfil, Usuario
 from app.schemas.gamificacao import (
     DesafioPublicoOut,
     HistoricoXPOut,
@@ -15,6 +20,7 @@ from app.schemas.gamificacao import (
 from app.services import gamificacao as servico
 
 router = APIRouter(prefix="/gamificacao", tags=["gamificacao"])
+PacienteAtual = Annotated[Usuario, Depends(exigir_perfil(Perfil.PACIENTE))]
 
 PacienteId = Annotated[int, Query(gt=0, description="Id do paciente solicitante")]
 Limite = Annotated[int, Query(ge=1, le=100, description="Numero maximo de posicoes a retornar")]
@@ -146,3 +152,28 @@ def listar_historico_xp(
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
 
     return [HistoricoXPOut.model_validate(r) for r in registros]
+
+
+class OfensivaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    streak: int
+    xp: int
+    bloqueios_perda: int
+    custo_bloqueio_xp: int = servico.CUSTO_BLOQUEIO_XP
+
+
+@router.get("")
+def consultar_ofensiva(db: DbSession, usuario: PacienteAtual) -> OfensivaOut:
+    paciente = db.get(Paciente, usuario.id)
+    if paciente is None:
+        raise HTTPException(404, "Paciente nao encontrado")
+    return OfensivaOut.model_validate(paciente)
+
+
+@router.post("/bloqueios")
+def comprar_bloqueio(db: DbSession, usuario: PacienteAtual) -> OfensivaOut:
+    paciente = servico.resgatar_bloqueio(db, usuario.id)
+    if paciente is None:
+        raise HTTPException(409, "XP insuficiente para resgatar o bloqueio")
+    return OfensivaOut.model_validate(paciente)

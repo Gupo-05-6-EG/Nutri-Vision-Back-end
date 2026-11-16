@@ -1,12 +1,25 @@
-"""Schemas Pydantic para Privacidade e Conformidade LGPD (RF29, RNF06, RNF07).
-
-Plano de Acao — item 51:
-DTOs publicos de ranking/desafio expondo apenas nome, avatar, pontos e streak,
-garantindo que dados clinicos e de saude (calorias, peso, refeicoes, metas)
-nao sejam retornados a terceiros.
+"""Contratos de privacidade (LGPD): consentimento e direitos do titular, e DTOs publicos
+de ranking/desafio expondo apenas nome, avatar, pontos e streak (RF29, RNF06, RNF07).
 """
 
+from datetime import datetime
+
 from pydantic import BaseModel, ConfigDict, Field
+
+
+class ConsentimentoIn(BaseModel):
+    versao_termo: str = Field(min_length=1, max_length=40, pattern=r"\S")
+
+
+class ConsentimentoOut(BaseModel):
+    versao_termo: str
+    aceito_em: datetime
+    revogado_em: datetime | None
+
+
+class ConsentimentoStatusOut(BaseModel):
+    consentimentos: list[ConsentimentoOut]
+    consentimento_ativo: bool
 
 
 class RankingPublicoItem(BaseModel):
