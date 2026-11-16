@@ -273,7 +273,9 @@ class TestMe:
 class TestFluxoCompleto:
     def test_cadastro_triagem_e_refeicao(self, client: TestClient) -> None:
         """O paciente cadastrado ja pode fazer a triagem e registrar refeicoes."""
-        paciente_id = _cadastrar_paciente(client)["usuario"]["id"]
+        cadastro = _cadastrar_paciente(client)
+        paciente_id = cadastro["usuario"]["id"]
+        headers = _auth(cadastro["access_token"])
 
         triagem = client.post(
             f"/api/v1/pacientes/{paciente_id}/triagem",
@@ -284,8 +286,11 @@ class TestFluxoCompleto:
                 "genero": "masculino",
                 "nivel_atividade": "moderado",
             },
+            headers=headers,
         )
-        refeicao = client.post("/api/v1/refeicoes", json=factories.refeicao(paciente_id))
+        refeicao = client.post(
+            "/api/v1/refeicoes", json=factories.refeicao(paciente_id), headers=headers
+        )
 
         assert triagem.status_code == 200, triagem.text
         assert refeicao.status_code == 201, refeicao.text

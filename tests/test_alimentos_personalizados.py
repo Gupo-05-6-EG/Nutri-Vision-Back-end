@@ -3,13 +3,23 @@
 from decimal import Decimal
 from typing import Any
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from app.models.alimento_taco import AlimentoTaco
+from tests import factories
 
 ROTA_CADASTRO = "/api/v1/alimentos-personalizados"
 ROTA_BUSCA = "/api/v1/alimentos"
+
+
+@pytest.fixture(autouse=True)
+def _pacientes_logados(client: TestClient, db: Session) -> None:
+    """Pacientes 1 e 2 existem; por padrao as requisicoes saem como o paciente 1."""
+    factories.criar_paciente(db, 1)
+    factories.criar_paciente(db, 2)
+    client.headers.update(factories.headers_de(1))
 
 
 def _payload(**sobrescrever: Any) -> dict[str, Any]:
@@ -26,7 +36,9 @@ def _payload(**sobrescrever: Any) -> dict[str, Any]:
 
 
 def _cadastrar(client: TestClient, **kwargs: Any) -> dict[str, Any]:
-    resposta = client.post(ROTA_CADASTRO, json=_payload(**kwargs))
+    # Quem cadastra e sempre o proprio paciente dono do alimento.
+    headers = factories.headers_de(kwargs.get("paciente_id", 1))
+    resposta = client.post(ROTA_CADASTRO, json=_payload(**kwargs), headers=headers)
     assert resposta.status_code == 201, resposta.text
     return resposta.json()
 
@@ -68,7 +80,11 @@ class TestCadastro:
     def test_aceita_mesmo_nome_para_pacientes_diferentes(self, client: TestClient) -> None:
         _cadastrar(client, paciente_id=1, nome="Bolo de fuba")
 
-        resposta = client.post(ROTA_CADASTRO, json=_payload(paciente_id=2, nome="Bolo de fuba"))
+        resposta = client.post(
+            ROTA_CADASTRO,
+            json=_payload(paciente_id=2, nome="Bolo de fuba"),
+            headers=factories.headers_de(2),
+        )
 
         assert resposta.status_code == 201
 
@@ -144,7 +160,11 @@ class TestBuscaUnificada:
     def test_nao_mostra_alimento_de_outro_paciente(self, client: TestClient) -> None:
         _cadastrar(client, paciente_id=1, nome="Bolo da tia")
 
-        corpo = client.get(ROTA_BUSCA, params={"nome": "bolo", "paciente_id": 2}).json()
+        corpo = client.get(
+            ROTA_BUSCA,
+            params={"nome": "bolo", "paciente_id": 2},
+            headers=factories.headers_de(2),
+        ).json()
 
         assert corpo == []
 
