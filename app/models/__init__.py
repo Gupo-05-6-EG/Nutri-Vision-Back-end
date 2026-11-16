@@ -10,6 +10,7 @@ from app.models.alimento_taco import AlimentoTaco
 from app.models.amizade import Amizade, StatusAmizade
 from app.models.auditoria import AcaoAuditoria, Auditoria, EntidadeAuditada
 from app.models.consentimento import Consentimento
+from app.models.desafio import Desafio, ParticipanteDesafio, StatusParticipante, TipoDesafio
 from app.models.historico_xp import HistoricoXP
 from app.models.lembrete_refeicao import DispositivoPush, LembreteRefeicao
 from app.models.paciente import Genero, NivelAtividade, Paciente
@@ -28,6 +29,7 @@ __all__ = [
     "Base",
     "CodigoVinculacao",
     "Consentimento",
+    "Desafio",
     "DispositivoPush",
     "EntidadeAuditada",
     "Genero",
@@ -37,14 +39,17 @@ __all__ = [
     "NivelAtividade",
     "Nutricionista",
     "Paciente",
+    "ParticipanteDesafio",
     "Perfil",
     "PlanoAlimentar",
     "Refeicao",
     "RefeicaoPlano",
     "StatusAmizade",
     "StatusCodigoVinculacao",
+    "StatusParticipante",
     "StatusVinculo",
     "TipoRefeicao",
+    "TipoDesafio",
     "Usuario",
     "Vinculo",
 ]

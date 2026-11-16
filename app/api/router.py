@@ -8,6 +8,7 @@ from app.api.routes import (
     amizades,
     auth,
     calculo_nutricional,
+    desafios,
     gamificacao,
     health,
     lembretes_refeicao,
@@ -32,5 +33,6 @@ api_router.include_router(refeicoes.router)
 api_router.include_router(relatorios.router)
 api_router.include_router(calculo_nutricional.router)
 api_router.include_router(vinculos.router)
+api_router.include_router(desafios.router)
 api_router.include_router(amizades.router)
 api_router.include_router(gamificacao.router)
