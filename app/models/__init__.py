@@ -15,7 +15,7 @@ from app.models.paciente import Genero, NivelAtividade, Paciente
 from app.models.plano_alimentar import AlimentoRefeicaoPlano, PlanoAlimentar, RefeicaoPlano
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.models.usuario import Nutricionista, Perfil, Usuario
-from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, Vinculo
+from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, StatusVinculo, Vinculo
 
 __all__ = [
     "AcaoAuditoria",
@@ -41,6 +41,7 @@ __all__ = [
     "RefeicaoPlano",
     "StatusAmizade",
     "StatusCodigoVinculacao",
+    "StatusVinculo",
     "TipoRefeicao",
     "Usuario",
     "Vinculo",
