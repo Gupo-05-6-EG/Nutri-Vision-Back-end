@@ -32,5 +32,32 @@ services:
       - ./alembic:/app/alembic
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  # Backup diario + teste semanal de restauracao (Task 7.2, RNF10).
+  # BACKUP_HOST_DIR deve ficar fora do disco do banco (outro disco, NAS, pasta
+  # sincronizada com a nuvem...).
+  backup:
+    image: postgres:16-alpine
+    container_name: nutrivision-backup
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: ${POSTGRES_USER:-nutrivision}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-nutrivision}
+      PGDATABASE: ${POSTGRES_DB:-nutrivision}
+      TZ: ${TZ:-America/Sao_Paulo}
+      BACKUP_DIR: /backups
+      BACKUP_CRON: ${BACKUP_CRON:-0 3 * * *}
+      BACKUP_TESTE_CRON: ${BACKUP_TESTE_CRON:-30 3 * * 0}
+      BACKUP_RETENCAO_DIAS: ${BACKUP_RETENCAO_DIAS:-7}
+      BACKUP_RETENCAO_SEMANAS: ${BACKUP_RETENCAO_SEMANAS:-4}
+      BACKUP_NA_INICIALIZACAO: ${BACKUP_NA_INICIALIZACAO:-false}
+    volumes:
+      - ./scripts/backup:/scripts:ro
+      - ${BACKUP_HOST_DIR:-./backups}:/backups
+    entrypoint: ["sh", "/scripts/agendar.sh"]
+    depends_on:
+      db:
+        condition: service_healthy
+
 volumes:
   postgres_data:

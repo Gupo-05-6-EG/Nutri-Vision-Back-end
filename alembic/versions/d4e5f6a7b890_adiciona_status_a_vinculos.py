@@ -3,7 +3,7 @@
 Task 1.5 [Back] - Status e Endpoints de Vinculo (RF14, RF15).
 
 Revision ID: d4e5f6a7b890
-Revises: b7c8d9e0f123
+Revises: 8f2c3d1e9a4b
 Create Date: 2026-11-06
 """
 
@@ -14,7 +14,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "d4e5f6a7b890"
-down_revision: str | None = "b7c8d9e0f123"
+down_revision: str | None = "8f2c3d1e9a4b"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

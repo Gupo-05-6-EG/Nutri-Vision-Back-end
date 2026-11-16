@@ -19,3 +19,7 @@ known-first-party = ["app", "tests"]
 pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q"
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
