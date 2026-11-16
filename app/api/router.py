@@ -5,8 +5,10 @@ from fastapi import APIRouter
 from app.api.routes import (
     alimentos_personalizados,
     alimentos_taco,
+    amizades,
     auth,
     calculo_nutricional,
+    gamificacao,
     health,
     lembretes_refeicao,
     pacientes,
@@ -26,3 +28,5 @@ api_router.include_router(lembretes_refeicao.router)
 api_router.include_router(refeicoes.router)
 api_router.include_router(calculo_nutricional.router)
 api_router.include_router(vinculos.router)
+api_router.include_router(amizades.router)
+api_router.include_router(gamificacao.router)

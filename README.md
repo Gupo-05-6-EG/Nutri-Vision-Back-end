@@ -513,8 +513,14 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
-| GET | `/api/v1/alimentos?nome=&paciente_id=` | Busca unificada: TACO + alimentos personalizados do paciente (RF22) |
 | POST | `/api/v1/calculo-nutricional` | Mapeia classes da IA para a TACO e calcula kcal/macros por porção (RF03, RF20, RF21) |
+| POST | `/api/v1/amizades` | Envia uma solicitação de amizade para outro paciente (RF05) |
+| PUT | `/api/v1/amizades/{id}/responder` | Aceita ou recusa convite de amizade recebido (RF05) |
+| GET | `/api/v1/amizades?paciente_id=&status=` | Lista amigos e convites de um paciente (RF05) |
+| DELETE | `/api/v1/amizades/{id}?paciente_id=` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
+| GET | `/api/v1/gamificacao/leaderboard?paciente_id=&limite=` | Leaderboard: Top 10 amigos por ganho de XP na janela semanal (RF05.3, RF29) |
+| POST | `/api/v1/gamificacao/xp` | Concede pontos de XP ao paciente e registra histórico (RF05, RF16) |
+| GET | `/api/v1/gamificacao/historico-xp?paciente_id=` | Histórico auditável de XP do paciente (RF16) |
 | GET | `/docs` | Swagger UI |
 
 > Os endpoints de vinculação exigem o token do login (`Authorization: Bearer ...`):
@@ -732,6 +738,12 @@ o app e o painel não precisarem fazer parse de texto em campo numérico.
 Todos os instantes são gravados e devolvidos em **UTC**, sempre com offset no
 JSON. O agrupamento por dia usa o dia em UTC — a conversão para o fuso do
 paciente fica no app e no painel.
+
+## Documentação Técnica do Sistema
+
+Para entender a arquitetura completa, integrações e modelagem de dados:
+- [Documento de Arquitetura](../Documentação/ARQUITETURA.md) — Visão C4, fluxos de integração e motor de regras.
+- [Modelagem de Banco de Dados](../Documentação/BANCO_DE_DADOS.md) — DER completo e dicionário de dados.
 
 ## Repositórios do projeto
 

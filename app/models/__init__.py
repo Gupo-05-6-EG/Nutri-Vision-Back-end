@@ -7,7 +7,9 @@ comparar o codigo com o banco, e so enxerga o que foi importado.
 from app.db.base import Base
 from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.alimento_taco import AlimentoTaco
+from app.models.amizade import Amizade, StatusAmizade
 from app.models.auditoria import AcaoAuditoria, Auditoria, EntidadeAuditada
+from app.models.historico_xp import HistoricoXP
 from app.models.lembrete_refeicao import DispositivoPush, LembreteRefeicao
 from app.models.paciente import Genero, NivelAtividade, Paciente
 from app.models.plano_alimentar import AlimentoRefeicaoPlano, PlanoAlimentar, RefeicaoPlano
@@ -20,12 +22,14 @@ __all__ = [
     "AlimentoPersonalizado",
     "AlimentoRefeicaoPlano",
     "AlimentoTaco",
+    "Amizade",
     "Auditoria",
     "Base",
     "CodigoVinculacao",
     "DispositivoPush",
     "EntidadeAuditada",
     "Genero",
+    "HistoricoXP",
     "ItemRefeicao",
     "LembreteRefeicao",
     "NivelAtividade",
@@ -35,6 +39,7 @@ __all__ = [
     "PlanoAlimentar",
     "Refeicao",
     "RefeicaoPlano",
+    "StatusAmizade",
     "StatusCodigoVinculacao",
     "TipoRefeicao",
     "Usuario",
