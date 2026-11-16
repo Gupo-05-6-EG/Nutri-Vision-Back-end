@@ -509,6 +509,11 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
+| GET | `/api/v1/privacidade/consentimento` | Consulta o histórico e o estado do consentimento (RF28, RNF07) |
+| POST | `/api/v1/privacidade/consentimento` | Registra aceite de uma versão do termo (RF28, RNF07) |
+| POST | `/api/v1/privacidade/consentimento/revogar` | Revoga o consentimento ativo |
+| GET | `/api/v1/privacidade/dados` | Exporta os dados da conta autenticada |
+| DELETE | `/api/v1/privacidade/conta` | Exclui a conta e os dados pessoais associados |
 | POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve ou edita o plano: salva uma versão nova e a torna a ativa (🔒 nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (🔒 nutricionista vinculado ou o próprio paciente) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/versoes` | Histórico de versões do plano, da mais nova para a mais antiga (RF08, 🔒 nutricionista vinculado) |
@@ -535,6 +540,12 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 > triagem ainda não exigem token: a Task 1.6 (RNF06) passa a exigir e a validar se
 > quem chama é o próprio paciente ou um nutricionista vinculado. O `paciente_id`
 > precisa ser de um paciente cadastrado (senão `422` em refeições e `404` na triagem).
+
+### Privacidade e direitos do titular (RF28, RNF07)
+
+Todas as rotas de privacidade exigem autenticação e operam somente sobre a conta do token. O aceite recebe `{"versao_termo": "1.0"}` e grava a versão e o instante; o histórico pode ser consultado e a revogação registra seu instante sem apagar o aceite anterior. Repetir o aceite da mesma versão enquanto ativo é idempotente.
+
+`GET /api/v1/privacidade/dados` exporta o perfil, consentimentos e registros relacionados à conta (triagem, refeições e itens, alimentos personalizados e vínculos, conforme o perfil). `DELETE /api/v1/privacidade/conta` exclui a conta autenticada; os dados vinculados são removidos pelas chaves estrangeiras em cascata e os alimentos personalizados do paciente são removidos explicitamente. A exclusão é permanente e responde `204`.
 
 ### Autenticação (RF13)
 
