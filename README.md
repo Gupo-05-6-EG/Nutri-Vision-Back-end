@@ -77,6 +77,28 @@ alembic upgrade head
 alembic downgrade -1
 ```
 
+## Desafios entre amigos (RF05.2, RF05.3)
+
+Depois de aplicar as migrations, pacientes autenticados podem criar desafios e
+convidar outros pacientes pelo ID. O convite precisa ser aceito para a pessoa
+entrar no placar. Tipos aceitos: `refeicoes` (dias em que as quatro categorias
+de refeição foram registradas), `variacao_calorica` (menor média de diferença absoluta entre o
+consumo diário e a meta calórica) e `sequencia_meta` (maior sequência de dias
+com pelo menos duas refeições e consumo até 30% da meta, seguindo o critério
+do processamento diário de gamificação). A variação calórica inclui dias sem
+registro como consumo zero. As datas são enviadas com fuso horário.
+
+- `POST /api/v1/challenges`: cria desafio; corpo: `nome`, `tipo`, `regra`,
+  `inicio_em`, `fim_em` e `convidados` (lista de IDs de pacientes, opcional).
+- `POST /api/v1/challenges/{id}/invites`: convida mais pacientes; corpo:
+  `pacientes` (lista de IDs).
+- `POST /api/v1/challenges/{id}/response`: aceita ou recusa; corpo:
+  `aceitar` (booleano).
+- `GET /api/v1/challenges`: lista desafios dos quais o usuário participa ou
+  para os quais foi convidado, com seu status.
+- `GET /api/v1/challenges/{id}/leaderboard`: retorna posições e pontuações;
+  apenas participantes que aceitaram o convite podem consultar o placar.
+
 ## Populando a TACO
 
 Depois das migrations (`alembic upgrade head`), importe a Tabela Brasileira de
@@ -191,8 +213,25 @@ O [`docker-compose.prod.yml`](docker-compose.prod.yml) sobrepõe o de desenvolvi
 
 **Health checks.** `GET /api/v1/health` (liveness: o processo responde) e
 `GET /api/v1/health/db` (readiness: o banco responde, senão `503`). Para monitorar o
-uptime, aponte um monitor externo (UptimeRobot, Better Stack, Uptime Kuma...) para
-`/api/v1/health/db`, com alerta por email/Telegram após 2 falhas seguidas.
+uptime há o workflow [`uptime.yml`](.github/workflows/uptime.yml): a cada 15 minutos ele
+chama `/api/v1/health/db` na URL da variável de repositório `UPTIME_URL` (Settings →
+Secrets and variables → Actions → Variables). Depois de 3 tentativas falhas, abre uma
+issue com a label `uptime` (ou comenta na aberta), e fecha a issue quando a API volta.
+Sem `UPTIME_URL` ele só registra um aviso. Um monitor externo (UptimeRobot, Better
+Stack...) pode ser somado a ele para alertas por Telegram ou SMS.
+
+**Imagem para o deploy.** O workflow [`imagem.yml`](.github/workflows/imagem.yml)
+publica a imagem no GitHub Container Registry a cada push na `main` (tags `latest` e
+`sha-<commit>`) e em tags `v*`. No servidor, basta trocar o `build` pela imagem:
+
+```bash
+docker pull ghcr.io/gupo-05-6-eg/nutri-vision-back-end:latest
+```
+
+**Fila de inferência.** A análise de fotos é desacoplada no
+[Nutri-Vision-IA](https://github.com/Gupo-05-6-EG/Nutri-Vision-IA): a API da IA
+enfileira cada foto no Redis (RQ), e o serviço `worker` processa a fila. Para escalar,
+suba mais workers com `docker compose up -d --scale worker=N`.
 
 **Logs e rastreio.** Toda resposta traz `X-Request-ID` (o do cliente, se vier, ou um
 gerado). Esse id aparece em todas as linhas de log da requisição. Cada requisição gera
@@ -218,12 +257,16 @@ ruff format .               # formatação
 ## CI/CD (RNF08)
 
 O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda em todo push e
-pull request para `main`/`develop`, com quatro jobs:
+pull request para `main`/`dev`, com cinco jobs:
 
 1. **lint** — `ruff check` + `ruff format --check`
 2. **test** — `pytest` com cobertura
 3. **migrations** — `alembic upgrade head` + `alembic check` contra um Postgres real
-4. **docker** — build da imagem e validação do `/health` no container
+4. **backup** — backup, retenção e teste de restauração contra um Postgres real
+5. **docker** — build da imagem e validação do `/health` no container
+
+Além dele, [`imagem.yml`](.github/workflows/imagem.yml) publica a imagem no GHCR e
+[`uptime.yml`](.github/workflows/uptime.yml) monitora a API publicada.
 
 ## Modelo de dados
 
@@ -484,7 +527,11 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | POST | `/api/v1/auth/login` | Login com email e senha (RF13) |
 | GET | `/api/v1/auth/me` | Usuário do token (🔒 Bearer) |
 | POST | `/api/v1/linking-code` | Gera um codigo de vinculacao de 6 digitos para o nutricionista autenticado |
-| POST | `/api/v1/link` | Resgata um codigo de vinculacao e cria o vinculo paciente-nutricionista |
+| POST | `/api/v1/link` | Paciente resgata um codigo e cria uma solicitacao pendente |
+| POST | `/api/v1/link/{nutricionista_id}/aceitar` | Paciente aceita a solicitacao de vinculo |
+| POST | `/api/v1/link/{nutricionista_id}/recusar` | Paciente recusa a solicitacao de vinculo |
+| GET | `/api/v1/patients?busca=` | Nutricionista lista pacientes ativos com busca opcional por nome |
+| DELETE | `/api/v1/patients/{paciente_id}` | Nutricionista encerra o vinculo ativo |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
 | GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
@@ -492,6 +539,11 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
 | DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
 | POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
+| GET | `/api/v1/privacidade/consentimento` | Consulta o histórico e o estado do consentimento (RF28, RNF07) |
+| POST | `/api/v1/privacidade/consentimento` | Registra aceite de uma versão do termo (RF28, RNF07) |
+| POST | `/api/v1/privacidade/consentimento/revogar` | Revoga o consentimento ativo |
+| GET | `/api/v1/privacidade/dados` | Exporta os dados da conta autenticada |
+| DELETE | `/api/v1/privacidade/conta` | Exclui a conta e os dados pessoais associados |
 | POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve ou edita o plano: salva uma versão nova e a torna a ativa (🔒 nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (🔒 nutricionista vinculado ou o próprio paciente) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/versoes` | Histórico de versões do plano, da mais nova para a mais antiga (RF08, 🔒 nutricionista vinculado) |
@@ -500,8 +552,14 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
-| GET | `/api/v1/alimentos?nome=&paciente_id=` | Busca unificada: TACO + alimentos personalizados do paciente (RF22) |
 | POST | `/api/v1/calculo-nutricional` | Mapeia classes da IA para a TACO e calcula kcal/macros por porção (RF03, RF20, RF21) |
+| POST | `/api/v1/amizades` | Envia uma solicitação de amizade para outro paciente (RF05) |
+| PUT | `/api/v1/amizades/{id}/responder` | Aceita ou recusa convite de amizade recebido (RF05) |
+| GET | `/api/v1/amizades?paciente_id=&status=` | Lista amigos e convites de um paciente (RF05) |
+| DELETE | `/api/v1/amizades/{id}?paciente_id=` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
+| GET | `/api/v1/gamificacao/leaderboard?paciente_id=&limite=` | Leaderboard: Top 10 amigos por ganho de XP na janela semanal (RF05.3, RF29) |
+| POST | `/api/v1/gamificacao/xp` | Concede pontos de XP ao paciente e registra histórico (RF05, RF16) |
+| GET | `/api/v1/gamificacao/historico-xp?paciente_id=` | Histórico auditável de XP do paciente (RF16) |
 | GET | `/docs` | Swagger UI |
 
 > Os endpoints de vinculação exigem o token do login (`Authorization: Bearer ...`):
@@ -512,6 +570,12 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 > triagem ainda não exigem token: a Task 1.6 (RNF06) passa a exigir e a validar se
 > quem chama é o próprio paciente ou um nutricionista vinculado. O `paciente_id`
 > precisa ser de um paciente cadastrado (senão `422` em refeições e `404` na triagem).
+
+### Privacidade e direitos do titular (RF28, RNF07)
+
+Todas as rotas de privacidade exigem autenticação e operam somente sobre a conta do token. O aceite recebe `{"versao_termo": "1.0"}` e grava a versão e o instante; o histórico pode ser consultado e a revogação registra seu instante sem apagar o aceite anterior. Repetir o aceite da mesma versão enquanto ativo é idempotente.
+
+`GET /api/v1/privacidade/dados` exporta o perfil, consentimentos e registros relacionados à conta (triagem, refeições e itens, alimentos personalizados e vínculos, conforme o perfil). `DELETE /api/v1/privacidade/conta` exclui a conta autenticada; os dados vinculados são removidos pelas chaves estrangeiras em cascata e os alimentos personalizados do paciente são removidos explicitamente. A exclusão é permanente e responde `204`.
 
 ### Autenticação (RF13)
 
@@ -673,6 +737,8 @@ Permite o vínculo entre paciente e nutricionista por meio de um código tempor�
 - `POST /api/v1/linking-code`: Exige autenticação de nutricionista (`Authorization: Bearer <token>`). Gera um código numérico de 6 dígitos que expira conforme `LINKING_CODE_EXPIRE_MINUTES`.
 - `POST /api/v1/link`: Exige autenticação de paciente. Recebe `{"codigo": "123456"}` e cria o vínculo de forma atômica e idempotente.
 
+Depois de resgatar o codigo, o paciente pode chamar `POST /api/v1/link/{nutricionista_id}/aceitar` ou `/recusar`. O status fica `pendente` ate a resposta; as transicoes finais sao `ativo` ou `recusado`. A rota `GET /api/v1/patients?busca=` lista os vinculos ativos do nutricionista autenticado, e `DELETE /api/v1/patients/{paciente_id}` os encerra com status `encerrado`. Vínculos existentes antes da migration `d4e5f6a7b890` sao preservados como `ativo`.
+
 **Comportamento de erro e respostas HTTP:**
 - `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, `sub` ausente ou inválido, ou usuário inexistente.
 - `403 Forbidden`: perfil incompatível (paciente tentando gerar código, nutricionista tentando resgatar, ou paciente tentando resgatar código gerado por ele mesmo).
@@ -719,6 +785,12 @@ o app e o painel não precisarem fazer parse de texto em campo numérico.
 Todos os instantes são gravados e devolvidos em **UTC**, sempre com offset no
 JSON. O agrupamento por dia usa o dia em UTC — a conversão para o fuso do
 paciente fica no app e no painel.
+
+## Documentação Técnica do Sistema
+
+Para entender a arquitetura completa, integrações e modelagem de dados:
+- [Documento de Arquitetura](../Documentação/ARQUITETURA.md) — Visão C4, fluxos de integração e motor de regras.
+- [Modelagem de Banco de Dados](../Documentação/BANCO_DE_DADOS.md) — DER completo e dicionário de dados.
 
 ## Repositórios do projeto
 
