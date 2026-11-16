@@ -23,6 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from app.core.crypto import TextoCifrado
 from app.db.base import Base
 
 CAMPOS_NUTRICIONAIS = ("calorias_kcal", "proteinas_g", "carboidratos_g", "gorduras_g")
@@ -64,7 +65,8 @@ class Refeicao(Base):
     # (ver `sugerir_tipo` em app/services/refeicoes.py).
     tipo: Mapped[str] = mapped_column(String(20), nullable=False)
 
-    observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Texto livre do paciente, pode citar saude: gravado cifrado (Task 1.6).
+    observacao: Mapped[str | None] = mapped_column(TextoCifrado, nullable=True)
 
     criada_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()

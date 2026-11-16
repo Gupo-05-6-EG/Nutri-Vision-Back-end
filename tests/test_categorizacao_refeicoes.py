@@ -19,6 +19,12 @@ def _paciente(db: Session) -> None:
     factories.criar_paciente(db, 1)
 
 
+@pytest.fixture(autouse=True)
+def _logado_como_paciente_1(client: TestClient) -> None:
+    """Por padrao as requisicoes saem autenticadas como o paciente 1 (Task 1.6)."""
+    client.headers.update(factories.headers_de(1))
+
+
 def _criar(client: TestClient, **kwargs: Any) -> dict[str, Any]:
     resposta = client.post(ROTA, json=factories.refeicao(**kwargs))
     assert resposta.status_code == 201, resposta.text

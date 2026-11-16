@@ -5,13 +5,19 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.core.security import gerar_hash_senha
+from app.core.security import criar_token_acesso, gerar_hash_senha
 from app.models.paciente import Paciente
 from app.models.usuario import Nutricionista, Perfil, Usuario
 
 SENHA_PADRAO = "senha-forte-123"
 # Calculado uma vez: bcrypt e lento de proposito, e cada teste cria pacientes.
 HASH_SENHA_PADRAO = gerar_hash_senha(SENHA_PADRAO)
+
+
+def headers_de(usuario_id: int, perfil: str = "paciente") -> dict[str, str]:
+    """Header `Authorization` com um token valido do usuario (que precisa existir no banco)."""
+    token, _ = criar_token_acesso(usuario_id, perfil)
+    return {"Authorization": f"Bearer {token}"}
 
 
 def item(
