@@ -8,6 +8,7 @@ from app.api.routes import (
     amizades,
     auth,
     calculo_nutricional,
+    conquistas,
     desafios,
     gamificacao,
     health,
@@ -23,6 +24,7 @@ from app.api.routes import (
 api_router = APIRouter()
 api_router.include_router(health.router)
 api_router.include_router(auth.router)
+api_router.include_router(conquistas.router)
 api_router.include_router(alimentos_taco.router)
 api_router.include_router(alimentos_personalizados.router)
 api_router.include_router(pacientes.router)

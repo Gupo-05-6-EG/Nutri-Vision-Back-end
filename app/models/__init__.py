@@ -9,6 +9,7 @@ from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.alimento_taco import AlimentoTaco
 from app.models.amizade import Amizade, StatusAmizade
 from app.models.auditoria import AcaoAuditoria, Auditoria, EntidadeAuditada
+from app.models.conquista import ConquistaPaciente
 from app.models.consentimento import Consentimento
 from app.models.desafio import Desafio, ParticipanteDesafio, StatusParticipante, TipoDesafio
 from app.models.historico_xp import HistoricoXP
@@ -28,6 +29,7 @@ __all__ = [
     "Auditoria",
     "Base",
     "CodigoVinculacao",
+    "ConquistaPaciente",
     "Consentimento",
     "Desafio",
     "DispositivoPush",

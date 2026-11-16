@@ -12,6 +12,7 @@ from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao
 from app.schemas.gamificacao import LeaderboardItem, LeaderboardOut
 from app.services import amizades as amizades_servico
+from app.services.conquistas import registrar_conquistas
 
 FUSO_HORARIO = ZoneInfo("America/Sao_Paulo")
 PERCENTUAL_MAXIMO_DA_META = Decimal("0.30")
@@ -223,8 +224,9 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
         .order_by(Paciente.id)
         .with_for_update()
     ).scalars()
-    processados = 0
+    ofensivas = {}
     for paciente in pacientes:
+        streak_anterior = paciente.streak
         quantidade, calorias = resultados.get(paciente.id, (0, Decimal(0)))
         cumpriu_meta = (
             paciente.meta_kcal is not None
@@ -239,10 +241,12 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
         else:
             paciente.streak = 0
         paciente.gamificacao_processada_em = dia
-        processados += 1
+        # Reconhece também a ofensiva que já existia antes do primeiro fechamento.
+        ofensivas[paciente.id] = max(streak_anterior, paciente.streak)
 
+    registrar_conquistas(db, ofensivas)
     db.commit()
-    return processados
+    return len(ofensivas)
 
 
 def hoje_local() -> date:

@@ -369,4 +369,4 @@ class TestMigrationAlembic:
         script = ScriptDirectory.from_config(config)
         heads = script.get_heads()
         assert len(heads) == 1, f"Esperava head unica, mas foram encontradas: {heads}"
-        assert heads[0] == "4d2f7a901bc3"
+        assert heads[0] == "7c46f031ab29"
