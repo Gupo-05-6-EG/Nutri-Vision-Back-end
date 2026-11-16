@@ -47,6 +47,7 @@ class Paciente(Base):
         CheckConstraint("meta_kcal >= 0", name="meta_kcal_nao_negativa"),
         CheckConstraint("streak >= 0", name="streak_nao_negativa"),
         CheckConstraint("xp >= 0", name="xp_nao_negativo"),
+        CheckConstraint("bloqueios_perda >= 0", name="bloqueios_nao_negativos"),
     )
 
     # Sem autoincrement: o id do paciente e o id do usuario.
@@ -67,6 +68,11 @@ class Paciente(Base):
     meta_kcal: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     origem_meta: Mapped[str | None] = mapped_column(String(30), nullable=True)
 
+    # Identidade social e gamificação (RF05, RF16, DER 3.3)
+    username: Mapped[str | None] = mapped_column(String(50), unique=True, nullable=True, index=True)
     streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     xp: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    bloqueios_perda: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
     gamificacao_processada_em: Mapped[date | None] = mapped_column(Date, nullable=True)
