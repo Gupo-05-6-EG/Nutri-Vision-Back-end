@@ -3,7 +3,7 @@
 Task 4.4 [Back] - Desafios entre Amigos (RF05.2, RF05.3).
 
 Revision ID: f5a6b7c8d9e0
-Revises: c4d9e1f6a2b3
+Revises: c3d4e5f6a7b8
 Create Date: 2026-11-09
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "f5a6b7c8d9e0"
-down_revision: str | None = "c4d9e1f6a2b3"
+down_revision: str | None = "c3d4e5f6a7b8"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

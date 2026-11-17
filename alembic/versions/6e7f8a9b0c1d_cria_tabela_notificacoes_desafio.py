@@ -3,7 +3,7 @@
 Task 4.5 [Back] - Notificacoes Motivacionais de Desafios via FCM (RF05.5).
 
 Revision ID: 6e7f8a9b0c1d
-Revises: f5a6b7c8d9e0
+Revises: 9a1b2c3d4e5f
 Create Date: 2026-11-11 16:50:00.000000
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "6e7f8a9b0c1d"
-down_revision: str | None = "f5a6b7c8d9e0"
+down_revision: str | None = "9a1b2c3d4e5f"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
