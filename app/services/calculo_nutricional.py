@@ -1,5 +1,8 @@
 """Mapeamento IA -> TACO e calculo por porcao (RF03, RF20, RF21).
 
+Cada item chega pelo id da TACO (como devolve `GET /analises/{id}`) ou pela
+classe + metodo de preparo do modelo antigo.
+
 O de-para fica em `data/mapeamento_ia_taco.csv` (classe do modelo + metodo de
 preparo -> nome exato do alimento na TACO), para ampliar sem mexer no codigo.
 
@@ -47,6 +50,14 @@ class AlimentoTacoAusente(Exception):
         self.nome = nome
 
 
+class AlimentoTacoIdInexistente(Exception):
+    """Nao ha alimento com o `alimento_taco_id` informado."""
+
+    def __init__(self, alimento_taco_id: int) -> None:
+        super().__init__(str(alimento_taco_id))
+        self.alimento_taco_id = alimento_taco_id
+
+
 @lru_cache
 def carregar_mapeamento() -> dict[tuple[str, str], str]:
     """(classe, metodo_preparo) -> nome do alimento na TACO."""
@@ -64,28 +75,45 @@ def _por_porcao(valor_100g: Decimal, gramas: Decimal) -> Decimal:
 
 
 def calcular_refeicao(db: Session, itens: list[ItemCalculoIn]) -> dict[str, object]:
+    """Macros por item e totais. Cada item vem por `alimento_taco_id` ou por
+    `classe` + `metodo_preparo` (de-para do CSV); os dois jeitos podem se misturar."""
     mapeamento = carregar_mapeamento()
 
-    nomes: list[str] = []
+    nomes: list[str | None] = []
     for item in itens:
+        if item.alimento_taco_id is not None:
+            nomes.append(None)
+            continue
         nome = mapeamento.get((item.classe, item.metodo_preparo.value))
         if nome is None:
             raise SemMapeamento(item.classe, item.metodo_preparo.value)
         nomes.append(nome)
 
-    alimentos = {
+    por_nome = {
         a.nome.strip(): a
-        for a in db.execute(select(AlimentoTaco).where(AlimentoTaco.nome.in_(set(nomes))))
+        for a in db.execute(
+            select(AlimentoTaco).where(AlimentoTaco.nome.in_({n for n in nomes if n}))
+        )
         .scalars()
         .all()
+    }
+    ids = {item.alimento_taco_id for item in itens if item.alimento_taco_id is not None}
+    por_id = {
+        a.id: a
+        for a in db.execute(select(AlimentoTaco).where(AlimentoTaco.id.in_(ids))).scalars().all()
     }
 
     linhas: list[dict[str, object]] = []
     totais = {campo: Decimal("0") for campo, _ in _CAMPOS}
     for item, nome in zip(itens, nomes, strict=True):
-        alimento = alimentos.get(nome)
-        if alimento is None:
-            raise AlimentoTacoAusente(nome)
+        if nome is None:
+            alimento = por_id.get(item.alimento_taco_id)
+            if alimento is None:
+                raise AlimentoTacoIdInexistente(item.alimento_taco_id)
+        else:
+            alimento = por_nome.get(nome)
+            if alimento is None:
+                raise AlimentoTacoAusente(nome)
         linha: dict[str, object] = {
             "classe": item.classe,
             "metodo_preparo": item.metodo_preparo,

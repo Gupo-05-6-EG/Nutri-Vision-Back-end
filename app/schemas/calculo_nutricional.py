@@ -6,8 +6,9 @@ Segue o contrato do resto da API: valores em `Decimal` por dentro e
 
 from decimal import Decimal
 from enum import StrEnum
+from typing import Self
 
-from pydantic import BaseModel, Field, field_serializer, field_validator
+from pydantic import BaseModel, Field, field_serializer, field_validator, model_validator
 
 LIMITE_GRAMAS = Decimal("100000")
 
@@ -22,21 +23,40 @@ class MetodoPreparo(StrEnum):
 
 
 class ItemCalculoIn(BaseModel):
-    """Um alimento reconhecido pelo modelo de IA, com a porcao em gramas."""
+    """Um alimento com a porcao em gramas, identificado de um destes jeitos:
 
-    classe: str = Field(
-        min_length=1, max_length=80, description="Classe devolvida pelo modelo (ex.: arroz)"
+    - `alimento_taco_id`: o id da nossa TACO, como vem em `GET /analises/{id}`;
+    - `classe` + `metodo_preparo`: convertidos pelo de-para `mapeamento_ia_taco.csv`.
+    """
+
+    alimento_taco_id: int | None = Field(
+        default=None, gt=0, description="Id em `alimento_taco` (ex.: vindo da analise da foto)"
     )
-    metodo_preparo: MetodoPreparo
+    classe: str | None = Field(
+        default=None, min_length=1, max_length=80, description="Classe do modelo (ex.: arroz)"
+    )
+    metodo_preparo: MetodoPreparo | None = None
     gramas: Decimal = Field(gt=0, le=LIMITE_GRAMAS, decimal_places=2)
 
     @field_validator("classe")
     @classmethod
-    def normalizar_classe(cls, valor: str) -> str:
+    def normalizar_classe(cls, valor: str | None) -> str | None:
+        if valor is None:
+            return None
         limpo = valor.strip().lower()
         if not limpo:
             raise ValueError("classe nao pode ser vazia")
         return limpo
+
+    @model_validator(mode="after")
+    def um_jeito_de_identificar(self) -> Self:
+        por_classe = self.classe is not None or self.metodo_preparo is not None
+        if self.alimento_taco_id is not None:
+            if por_classe:
+                raise ValueError("informe alimento_taco_id ou classe + metodo_preparo, nao ambos")
+        elif self.classe is None or self.metodo_preparo is None:
+            raise ValueError("informe alimento_taco_id ou classe + metodo_preparo")
+        return self
 
 
 class CalculoNutricionalIn(BaseModel):
@@ -44,8 +64,9 @@ class CalculoNutricionalIn(BaseModel):
 
 
 class ItemCalculoOut(BaseModel):
-    classe: str
-    metodo_preparo: MetodoPreparo
+    # Nulos quando o item veio por `alimento_taco_id`.
+    classe: str | None
+    metodo_preparo: MetodoPreparo | None
     alimento_taco_id: int
     alimento_taco: str
     gramas: Decimal

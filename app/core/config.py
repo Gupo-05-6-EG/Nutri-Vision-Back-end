@@ -50,8 +50,12 @@ class Settings(BaseSettings):
         "http://localhost:8080",
     ]
 
-    # Servico de IA (usado a partir da Task 3.1)
+    # Servico de IA (Nutri-Vision-IA): analise de fotos de refeicoes
     AI_SERVICE_URL: str = "http://localhost:8001"
+    # Tempo maximo de cada chamada ao servico de IA (envio da foto ou consulta)
+    AI_SERVICE_TIMEOUT_S: float = 30.0
+    # Mesmo limite de upload do servico de IA (10 MB)
+    AI_MAX_UPLOAD_BYTES: int = 10 * 1024 * 1024
 
     # Push via Firebase Cloud Messaging (Task 2.8): caminho do JSON da conta de servico.
     FCM_CREDENTIALS_FILE: str | None = None

@@ -134,6 +134,73 @@ class TestErros:
         assert client.post(ROTA, json={"itens": []}).status_code == 422
 
 
+class TestPorIdDaTaco:
+    """Itens identificados pelo id da TACO, como vem de `GET /analises/{id}`."""
+
+    def _id(self, db: Session, nome: str) -> int:
+        return db.query(AlimentoTaco).filter_by(nome=nome).one().id
+
+    def test_calcula_pelo_id(self, client: TestClient, db: Session) -> None:
+        _popular(db)
+        arroz_id = self._id(db, "Arroz, tipo 1, cozido")
+
+        resposta = client.post(
+            ROTA, json={"itens": [{"alimento_taco_id": arroz_id, "gramas": "150"}]}
+        )
+
+        assert resposta.status_code == 200, resposta.text
+        item = resposta.json()["itens"][0]
+        assert item["alimento_taco_id"] == arroz_id
+        assert item["alimento_taco"] == "Arroz, tipo 1, cozido"
+        assert item["calorias_kcal"] == 192.0
+        assert item["classe"] is None
+        assert item["metodo_preparo"] is None
+
+    def test_mistura_id_e_classe_no_mesmo_calculo(self, client: TestClient, db: Session) -> None:
+        _popular(db)
+        frita_id = self._id(db, "Batata, inglesa, frita")
+
+        corpo = client.post(
+            ROTA,
+            json={
+                "itens": [
+                    _item("arroz", "cozido", "150"),
+                    {"alimento_taco_id": frita_id, "gramas": "80"},
+                ]
+            },
+        ).json()
+
+        assert [i["alimento_taco"] for i in corpo["itens"]] == [
+            "Arroz, tipo 1, cozido",
+            "Batata, inglesa, frita",
+        ]
+        assert corpo["totais"]["calorias_kcal"] == 405.6
+
+    def test_id_inexistente_da_404(self, client: TestClient, db: Session) -> None:
+        _popular(db)
+
+        resposta = client.post(ROTA, json={"itens": [{"alimento_taco_id": 9999, "gramas": "100"}]})
+
+        assert resposta.status_code == 404
+        assert "9999" in resposta.json()["detail"]
+
+    @pytest.mark.parametrize(
+        "item",
+        [
+            {"gramas": "100"},
+            {"classe": "arroz", "gramas": "100"},
+            {"metodo_preparo": "cozido", "gramas": "100"},
+            {"alimento_taco_id": 1, "classe": "arroz", "metodo_preparo": "cozido", "gramas": "100"},
+            {"alimento_taco_id": 0, "gramas": "100"},
+        ],
+        ids=["nenhum", "so_classe", "so_preparo", "os_dois", "id_zero"],
+    )
+    def test_exige_um_jeito_de_identificar_o_alimento(
+        self, client: TestClient, item: dict[str, object]
+    ) -> None:
+        assert client.post(ROTA, json={"itens": [item]}).status_code == 422
+
+
 def test_todo_de_para_aponta_para_um_alimento_existente_na_taco() -> None:
     """Protege o CSV de de-para contra erro de digitacao no nome da TACO."""
     taco = _nomes_da_taco()

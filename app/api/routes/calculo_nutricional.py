@@ -1,7 +1,8 @@
 """Endpoint de calculo nutricional por porcao (RF03, RF20, RF21).
 
-Recebe as classes reconhecidas pelo modelo de IA com o metodo de preparo e as
-gramas, mapeia cada uma para a TACO e devolve kcal, proteinas, carboidratos e
+Recebe os alimentos com as gramas - pelo id da TACO (o que `GET /analises/{id}`
+devolve) ou pela classe do modelo com o metodo de preparo, mapeada para a TACO
+pelo de-para - e devolve kcal, proteinas, carboidratos e
 gorduras por item e da refeicao. Nao grava nada: o registro da refeicao
 continua em `POST /refeicoes`. Exige token de qualquer perfil (Task 1.6).
 """
@@ -19,7 +20,7 @@ router = APIRouter(prefix="/calculo-nutricional", tags=["calculo-nutricional"])
 @router.post(
     "",
     response_model=CalculoNutricionalOut,
-    summary="Calcula a tabela nutricional da refeicao a partir das classes da IA",
+    summary="Calcula a tabela nutricional da refeicao (por id da TACO ou classe da IA)",
 )
 def calcular(
     dados: CalculoNutricionalIn, db: DbSession, _usuario: UsuarioAtual
@@ -31,6 +32,11 @@ def calcular(
             status.HTTP_422_UNPROCESSABLE_ENTITY,
             f"Sem mapeamento TACO para a classe '{erro.classe}' "
             f"com preparo '{erro.metodo_preparo}'",
+        ) from None
+    except servico.AlimentoTacoIdInexistente as erro:
+        raise HTTPException(
+            status.HTTP_404_NOT_FOUND,
+            f"Alimento TACO de id {erro.alimento_taco_id} nao encontrado",
         ) from None
     except servico.AlimentoTacoAusente as erro:
         raise HTTPException(
