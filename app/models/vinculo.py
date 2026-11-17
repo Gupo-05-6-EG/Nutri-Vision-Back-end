@@ -24,6 +24,13 @@ class StatusCodigoVinculacao(StrEnum):
     EXPIRADO = "expirado"
 
 
+class StatusVinculo(StrEnum):
+    PENDENTE = "pendente"
+    ATIVO = "ativo"
+    RECUSADO = "recusado"
+    ENCERRADO = "encerrado"
+
+
 class CodigoVinculacao(Base):
     """Codigo temporario gerado por nutricionista para permitir o primeiro vinculo."""
 
@@ -87,4 +94,10 @@ class Vinculo(Base):
     )
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default=StatusVinculo.PENDENTE.value,
+        server_default=StatusVinculo.PENDENTE.value,
     )

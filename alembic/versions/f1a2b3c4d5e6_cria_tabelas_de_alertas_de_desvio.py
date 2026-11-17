@@ -3,7 +3,7 @@
 Task 5.4 [Back] - Alertas de Desvio de Meta (RF10.2).
 
 Revision ID: f1a2b3c4d5e6
-Revises: c4d9e1f6a2b3
+Revises: 6e7f8a9b0c1d
 Create Date: 2026-11-14
 """
 
@@ -13,7 +13,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "f1a2b3c4d5e6"
-down_revision: str | None = "c4d9e1f6a2b3"
+down_revision: str | None = "6e7f8a9b0c1d"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
