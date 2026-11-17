@@ -149,6 +149,7 @@ no caminho, na query ou no corpo, e é conferido contra o token:
 | Gerar código de vinculação (`/linking-code`) | só nutricionista |
 | Resgatar código (`/link`) | só paciente |
 | Busca na TACO (`/alimentos-taco`, `/alimentos` sem `paciente_id`) e `/calculo-nutricional` | qualquer usuário logado |
+| Análise de fotos pela IA (`/analises`) | só pacientes |
 
 Sem acesso a resposta é `403` — inclusive quando o paciente não existe, para a API não
 revelar quais ids existem. Ter vínculo com um paciente não dá acesso a outro.
@@ -578,7 +579,9 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
-| POST | `/api/v1/calculo-nutricional` | Mapeia classes da IA para a TACO e calcula kcal/macros por porção (RF03, RF20, RF21) |
+| POST | `/api/v1/analises` | Envia a foto do prato para a IA analisar (multipart `file`, 🔒 paciente) |
+| GET | `/api/v1/analises/{id}` | Andamento e resultado da análise: alimentos da TACO com kcal/macros das gramas estimadas (🔒 paciente) |
+| POST | `/api/v1/calculo-nutricional` | Calcula kcal/macros por porção, por id da TACO ou classe da IA (RF03, RF20, RF21) |
 | POST | `/api/v1/amizades` | Envia uma solicitação de amizade para outro paciente (RF05) |
 | PUT | `/api/v1/amizades/{id}/responder` | Aceita ou recusa convite de amizade recebido (RF05) |
 | GET | `/api/v1/amizades?paciente_id=&status=` | Lista amigos e convites de um paciente (RF05) |
@@ -688,15 +691,65 @@ curl -X POST http://localhost:8000/api/v1/refeicoes   -H 'Content-Type: applicat
 curl 'http://localhost:8000/api/v1/refeicoes/consumo-diario?paciente_id=1&data=2026-09-20'
 ```
 
-### Cálculo nutricional por porção (RF03, RF20, RF21)
+### Análise de fotos pela IA (RF02, RF03)
 
-`POST /api/v1/calculo-nutricional` recebe as classes reconhecidas pelo modelo de IA,
-o método de preparo e as gramas, e devolve a tabela nutricional da refeição (kcal,
-proteínas, carboidratos e gorduras por item e total). Não grava nada.
+O reconhecimento roda no [Nutri-Vision-IA](https://github.com/Gupo-05-6-EG/Nutri-Vision-IA)
+(Gemini + fila Redis), um serviço à parte apontado por `AI_SERVICE_URL`. O back-end repassa a
+foto e devolve o resultado já ligado à nossa TACO. A análise é assíncrona:
+
+1. `POST /api/v1/analises` (multipart, campo `file`, até 10 MB) → `202 {"id", "status": "QUEUED"}`.
+   Foto borrada ou mal iluminada volta na hora como `NOT_ESTIMATED` com `motivo: bad_photo` e
+   `problemas` (`blurry`, `too_dark`, `too_bright`).
+2. `GET /api/v1/analises/{id}` a cada poucos segundos, até o status sair de `QUEUED`/`PROCESSING`:
 
 ```json
-{"itens": [{"classe": "arroz", "metodo_preparo": "cozido", "gramas": 150}]}
+{"id": "6f1c...", "status": "DONE", "versao_modelo": "gemini-3.8-flash",
+ "itens": [
+   {"alimento": "Arroz, tipo 1, cozido", "alimento_taco_id": 12, "gramas": 160.0, "confianca": 0.95,
+    "calorias_kcal": 204.8, "proteinas_g": 4.0, "carboidratos_g": 44.96, "gorduras_g": 0.32},
+   {"alimento": "farofa", "alimento_taco_id": null, "gramas": 30.0, "confianca": 0.7,
+    "calorias_kcal": null, "proteinas_g": null, "carboidratos_g": null, "gorduras_g": null}],
+ "totais": {"calorias_kcal": 204.8, "proteinas_g": 4.0, "carboidratos_g": 44.96, "gorduras_g": 0.32}}
 ```
+
+| status | quando |
+|---|---|
+| `QUEUED` / `PROCESSING` | ainda em análise — consulte de novo |
+| `DONE` | alimentos identificados (`itens`, `totais`) |
+| `NOT_ESTIMATED` | não deu para estimar: `motivo` = `bad_photo`, `nothing_detected` ou `low_confidence` |
+| `FAILED` | o modelo falhou mesmo com novas tentativas (`erro`) |
+
+- **Ligação com a TACO pelo nome**, não pelo `taco_id` da IA: ela numera os 597 alimentos da
+  TACO original e a nossa tabela tem 590, com ids diferentes em parte deles. O nome é comparado
+  sem diferença de caixa e de espaços. Alimento que não está na nossa tabela vem com
+  `alimento_taco_id` e macros nulos, e fica fora dos `totais`.
+- As macros usam a mesma fórmula do cálculo por porção (abaixo). Para recalcular depois que o
+  paciente editar as gramas, use `POST /calculo-nutricional` com `alimento_taco_id`.
+- Nada é gravado: o paciente revisa e registra a refeição em `POST /refeicoes`. A foto não é
+  guardada, e o resultado expira na IA depois de 24 h (`404`).
+- Só pacientes analisam fotos (`403` para nutricionista). IA fora do ar ou lenta
+  (`AI_SERVICE_TIMEOUT_S`) → `503`.
+- Para rodar junto: suba o Nutri-Vision-IA (`docker compose up` no repositório dele, porta
+  8000) e aponte `AI_SERVICE_URL` para ele — com o back-end no Docker,
+  `http://host.docker.internal:8000`.
+
+### Cálculo nutricional por porção (RF03, RF20, RF21)
+
+`POST /api/v1/calculo-nutricional` recebe os alimentos com as gramas e devolve a tabela
+nutricional da refeição (kcal, proteínas, carboidratos e gorduras por item e total). Não
+grava nada. Cada item vem de um destes jeitos (podem se misturar):
+
+```json
+{"itens": [
+  {"alimento_taco_id": 12, "gramas": 150},
+  {"classe": "arroz", "metodo_preparo": "cozido", "gramas": 150}
+]}
+```
+
+- `alimento_taco_id`: o id da nossa TACO, como vem em `GET /analises/{id}` — é o que o app
+  usa para recalcular depois que o paciente edita as gramas. Id inexistente → `404`.
+- `classe` + `metodo_preparo`: o formato antigo, convertido pelo de-para abaixo. Informar
+  os dois jeitos no mesmo item, ou nenhum, → `422`.
 
 - `metodo_preparo`: `cru` \| `cozido` \| `frito`.
 - O de-para (classe + preparo → alimento da TACO) fica em
