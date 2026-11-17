@@ -4,6 +4,9 @@ Todas exigem token (Task 1.6, RNF06). Leitura: o proprio paciente ou um
 nutricionista com vinculo com ele. Escrita (registrar, editar, remover): so o
 proprio paciente. `paciente_id` continua chegando por parametro/corpo e e
 conferido contra o token.
+
+`POST /refeicoes/batch` recebe o lote de refeicoes feitas offline no app e
+deduplica reenvios (Task 2.3, RNF07).
 """
 
 from datetime import date
@@ -19,7 +22,15 @@ from app.api.deps import (
 )
 from app.db.deps import DbSession
 from app.models.refeicao import TipoRefeicao
-from app.schemas.refeicao import ConsumoDiario, RefeicaoCreate, RefeicaoOut, RefeicaoUpdate
+from app.schemas.refeicao import (
+    ConsumoDiario,
+    RefeicaoCreate,
+    RefeicaoLoteOut,
+    RefeicaoOut,
+    RefeicaoUpdate,
+    RefeicoesLoteIn,
+    RefeicoesLoteResultado,
+)
 from app.services import refeicoes as servico
 
 router = APIRouter(prefix="/refeicoes", tags=["refeicoes"])
@@ -54,6 +65,46 @@ def registrar_refeicao(dados: RefeicaoCreate, db: DbSession, usuario: UsuarioAtu
             detail="consumida_em nao pode estar no futuro",
         ) from None
     return RefeicaoOut.model_validate(refeicao)
+
+
+@router.post(
+    "/batch",
+    response_model=RefeicoesLoteResultado,
+    summary="Sincroniza em lote as refeicoes registradas offline, sem duplicar reenvios",
+)
+def sincronizar_lote(
+    dados: RefeicoesLoteIn, db: DbSession, usuario: UsuarioAtual
+) -> RefeicoesLoteResultado:
+    """Grava o lote inteiro ou nenhuma refeicao (Task 2.3, RNF07).
+
+    Uma refeicao identica a uma ja gravada (mesmo instante, tipo, observacao e
+    itens) nao e gravada de novo: volta com o id existente e `duplicada=true`,
+    para o app marcar o registro local como sincronizado.
+    """
+    garantir_propria_conta(usuario, dados.paciente_id)
+    try:
+        resultado = servico.criar_refeicoes_em_lote(db, dados.paciente_id, dados.refeicoes)
+    except servico.PacienteNaoEncontrado:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="paciente_id nao corresponde a um paciente cadastrado",
+        ) from None
+    except servico.RefeicaoInvalidaNoLote as erro:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(erro)
+        ) from None
+
+    refeicoes = [
+        RefeicaoLoteOut(**dict(RefeicaoOut.model_validate(refeicao)), duplicada=duplicada)
+        for refeicao, duplicada in resultado
+    ]
+    duplicadas = sum(duplicada for _, duplicada in resultado)
+    return RefeicoesLoteResultado(
+        paciente_id=dados.paciente_id,
+        criadas=len(resultado) - duplicadas,
+        duplicadas=duplicadas,
+        refeicoes=refeicoes,
+    )
 
 
 @router.get("", response_model=list[RefeicaoOut], summary="Lista as refeicoes de um paciente")

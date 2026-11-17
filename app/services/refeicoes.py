@@ -1,5 +1,6 @@
-"""Regras de negocio das refeicoes (RF04, RF12, RF19)."""
+"""Regras de negocio das refeicoes (RF04, RF12, RF19) e da sincronizacao em lote (RNF07)."""
 
+from collections.abc import Iterable, Sequence
 from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 
@@ -8,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models.paciente import Paciente
 from app.models.refeicao import CAMPOS_NUTRICIONAIS, ItemRefeicao, Refeicao, TipoRefeicao, somar
-from app.schemas.refeicao import RefeicaoCreate, RefeicaoUpdate
+from app.schemas.refeicao import ItemRefeicaoCreate, RefeicaoCreate, RefeicaoUpdate
 
 # Janelas de horario (hora local tratada como UTC, igual ao resto da app -
 # ver `_em_utc`) usadas para sugerir o tipo quando o cliente nao informa um.
@@ -31,6 +32,16 @@ class PacienteNaoEncontrado(Exception):
 
 class DataDeConsumoNoFuturo(Exception):
     """`consumida_em` esta a frente do momento atual."""
+
+
+class RefeicaoInvalidaNoLote(Exception):
+    """Uma refeicao do lote nao pode ser gravada; nenhuma refeicao do lote e gravada."""
+
+    def __init__(self, indice: int, campo: str, motivo: str) -> None:
+        super().__init__(f"refeicoes[{indice}].{campo} {motivo}")
+        self.indice = indice
+        self.campo = campo
+        self.motivo = motivo
 
 
 def _em_utc(momento: datetime) -> datetime:
@@ -78,6 +89,115 @@ def criar_refeicao(db: Session, dados: RefeicaoCreate) -> Refeicao:
     db.commit()
     db.refresh(refeicao)
     return refeicao
+
+
+_CENTAVO = Decimal("0.01")
+
+# Identidade de uma refeicao para fins de deduplicacao (ver `_impressao`).
+Impressao = tuple[int, datetime, str, str | None, tuple[tuple[object, ...], ...]]
+
+
+def _impressao(
+    paciente_id: int,
+    consumida_em: datetime,
+    tipo: str,
+    observacao: str | None,
+    itens: Iterable[ItemRefeicao | ItemRefeicaoCreate],
+) -> Impressao:
+    """Impressao digital de uma refeicao, usada para reconhecer reenvios (RNF07).
+
+    Duas refeicoes sao a mesma quando tem o mesmo paciente, instante (em UTC),
+    tipo, observacao e o mesmo conjunto de itens - a ordem dos itens nao
+    importa. Serve tanto para o que chega na requisicao quanto para o que ja
+    esta no banco (a observacao cifrada ja vem decifrada pelo `TextoCifrado`).
+    """
+    observacao_normalizada = (observacao or "").strip() or None
+    chaves_itens = sorted(
+        (
+            item.nome_alimento.strip(),
+            *(
+                Decimal(getattr(item, campo)).quantize(_CENTAVO)
+                for campo in ("quantidade_g", *CAMPOS_NUTRICIONAIS)
+            ),
+        )
+        for item in itens
+    )
+    return (
+        paciente_id,
+        _em_utc(consumida_em),
+        str(tipo),
+        observacao_normalizada,
+        tuple(chaves_itens),
+    )
+
+
+def criar_refeicoes_em_lote(
+    db: Session, paciente_id: int, refeicoes: Sequence[RefeicaoCreate]
+) -> list[tuple[Refeicao, bool]]:
+    """Grava um lote de refeicoes feitas offline, sem duplicar reenvios (RNF07).
+
+    Devolve, na mesma ordem do lote, cada refeicao e se ela ja existia
+    (`True`) ou foi criada agora (`False`). Uma refeicao repetida - ja gravada
+    antes ou repetida dentro do proprio lote - devolve a que ja existe.
+
+    E tudo ou nada: o lote inteiro e validado antes de gravar, e qualquer
+    refeicao invalida levanta `RefeicaoInvalidaNoLote` sem gravar nenhuma.
+    """
+    if db.get(Paciente, paciente_id) is None:
+        raise PacienteNaoEncontrado
+
+    preparadas: list[tuple[RefeicaoCreate, datetime, str]] = []
+    for indice, dados in enumerate(refeicoes):
+        if dados.paciente_id != paciente_id:
+            raise RefeicaoInvalidaNoLote(indice, "paciente_id", "difere do paciente_id do lote")
+        try:
+            consumida_em = _validar_consumida_em(dados.consumida_em)
+        except DataDeConsumoNoFuturo:
+            raise RefeicaoInvalidaNoLote(
+                indice, "consumida_em", "nao pode estar no futuro"
+            ) from None
+        tipo = dados.tipo or sugerir_tipo(consumida_em)
+        preparadas.append((dados, consumida_em, str(tipo)))
+
+    # Uma consulta so: as refeicoes do paciente na janela de tempo do lote.
+    instantes = [consumida_em for _, consumida_em, _ in preparadas]
+    existentes = db.execute(
+        select(Refeicao).where(
+            Refeicao.paciente_id == paciente_id,
+            Refeicao.consumida_em >= min(instantes),
+            Refeicao.consumida_em <= max(instantes),
+        )
+    ).scalars()
+    conhecidas: dict[Impressao, Refeicao] = {}
+    for refeicao in existentes:
+        chave = _impressao(
+            paciente_id, refeicao.consumida_em, refeicao.tipo, refeicao.observacao, refeicao.itens
+        )
+        conhecidas.setdefault(chave, refeicao)
+
+    resultado: list[tuple[Refeicao, bool]] = []
+    novas: list[Refeicao] = []
+    for dados, consumida_em, tipo in preparadas:
+        chave = _impressao(paciente_id, consumida_em, tipo, dados.observacao, dados.itens)
+        if chave in conhecidas:
+            resultado.append((conhecidas[chave], True))
+            continue
+        refeicao = Refeicao(
+            paciente_id=paciente_id,
+            consumida_em=consumida_em,
+            tipo=tipo,
+            observacao=dados.observacao,
+            itens=[ItemRefeicao(**item.model_dump()) for item in dados.itens],
+        )
+        db.add(refeicao)
+        conhecidas[chave] = refeicao
+        novas.append(refeicao)
+        resultado.append((refeicao, False))
+
+    db.commit()
+    for refeicao in novas:
+        db.refresh(refeicao)
+    return resultado
 
 
 def buscar_refeicao(db: Session, refeicao_id: int) -> Refeicao:

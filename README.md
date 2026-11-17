@@ -558,6 +558,7 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | GET | `/api/v1/patients?busca=` | Nutricionista lista pacientes ativos com busca opcional por nome |
 | DELETE | `/api/v1/patients/{paciente_id}` | Nutricionista encerra o vinculo ativo |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
+| POST | `/api/v1/refeicoes/batch` | Sincroniza em lote as refeições registradas offline no app, sem duplicar reenvios (RNF07) |
 | GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
 | GET | `/api/v1/refeicoes/{id}` | Detalhe de uma refeição |
@@ -800,6 +801,27 @@ A auditoria também registra os **dados clínicos**: cada `POST /pacientes/{id}/
 muda peso, altura, idade, gênero, nível de atividade ou a meta calórica grava os valores de
 antes e depois, tendo o paciente como autor. Refazer a triagem com os mesmos valores não
 gera registro. Ainda não há endpoint para consultar a tabela `auditorias`.
+
+### Sincronização em lote de refeições offline (RNF07)
+
+O app grava no aparelho as refeições registradas sem internet e, quando a conexão
+volta, envia todas de uma vez para `POST /api/v1/refeicoes/batch`:
+
+```json
+{ "paciente_id": 7, "refeicoes": [ { "paciente_id": 7, "consumida_em": "2026-10-20T12:30:00Z", "tipo": "almoco", "itens": [ ... ] } ] }
+```
+
+- **Tudo ou nada:** o lote é validado inteiro antes de gravar. Se uma refeição for
+  inválida (ex.: `consumida_em` no futuro), a API responde 422 indicando qual
+  (`refeicoes[2].consumida_em ...`) e nenhuma refeição do lote é gravada.
+- **Deduplicação:** uma refeição com o mesmo paciente, instante, tipo, observação
+  e itens (em qualquer ordem) de uma já gravada não é gravada de novo — inclusive
+  se ela se repetir dentro do próprio lote. Assim, reenviar um lote cuja resposta
+  se perdeu não duplica nada.
+- A resposta (200) traz `criadas`, `duplicadas` e a lista `refeicoes` **na mesma
+  ordem do envio**, cada uma com o `id` (o existente, quando `duplicada: true`)
+  para o app marcar o registro local como sincronizado.
+- Até 500 refeições por lote; só o próprio paciente pode enviar o seu.
 
 ### Valores nutricionais
 
