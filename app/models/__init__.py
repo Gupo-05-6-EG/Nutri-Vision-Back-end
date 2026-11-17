@@ -14,6 +14,7 @@ from app.models.consentimento import Consentimento
 from app.models.desafio import Desafio, ParticipanteDesafio, StatusParticipante, TipoDesafio
 from app.models.historico_xp import HistoricoXP
 from app.models.lembrete_refeicao import DispositivoPush, LembreteRefeicao
+from app.models.notificacao_desafio import NotificacaoDesafio
 from app.models.paciente import Genero, NivelAtividade, Paciente
 from app.models.plano_alimentar import AlimentoRefeicaoPlano, PlanoAlimentar, RefeicaoPlano
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
@@ -39,6 +40,7 @@ __all__ = [
     "ItemRefeicao",
     "LembreteRefeicao",
     "NivelAtividade",
+    "NotificacaoDesafio",
     "Nutricionista",
     "Paciente",
     "ParticipanteDesafio",
