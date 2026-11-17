@@ -120,6 +120,31 @@ class RefeicaoOut(BaseModel):
         return valor if valor.tzinfo else valor.replace(tzinfo=UTC)
 
 
+class RefeicoesLoteIn(BaseModel):
+    """Lote de refeicoes registradas offline no app (Task 2.3, RNF07).
+
+    O app envia todas as pendentes de uma vez quando a conexao volta, entao o
+    limite e folgado: recusar um lote grande travaria a sincronizacao.
+    """
+
+    paciente_id: int = Field(gt=0)
+    refeicoes: list[RefeicaoCreate] = Field(min_length=1, max_length=500)
+
+
+class RefeicaoLoteOut(RefeicaoOut):
+    # True quando a refeicao ja existia (reenvio) e nao foi gravada de novo.
+    duplicada: bool
+
+
+class RefeicoesLoteResultado(BaseModel):
+    """Resultado do lote, com as refeicoes na mesma ordem do envio."""
+
+    paciente_id: int
+    criadas: int
+    duplicadas: int
+    refeicoes: list[RefeicaoLoteOut]
+
+
 class ConsumoDiario(BaseModel):
     """Consumo de um paciente em um dia, com os totais (RF12)."""
 
