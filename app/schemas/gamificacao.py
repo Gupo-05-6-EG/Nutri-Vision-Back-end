@@ -39,6 +39,19 @@ class LeaderboardItem(BaseModel):
     streak: int = Field(ge=0, description="Dias consecutivos de ofensiva ativa")
     e_voce: bool = Field(default=False, description="Flag indicando se o registro e do solicitante")
 
+    def to_publico(
+        self, nome: str | None = None, avatar: str | None = None
+    ) -> "RankingPublicoItem":
+        """Converte o item do placar para o DTO estritamente publico (LGPD / RF29)."""
+        from app.schemas.privacidade import RankingPublicoItem
+
+        return RankingPublicoItem(
+            nome=nome or self.username,
+            avatar=avatar,
+            pontos=self.xp_semanal,
+            streak=self.streak,
+        )
+
 
 class LeaderboardOut(BaseModel):
     """Leaderboard de amigos com base no XP acumulado na janela semanal."""
@@ -56,3 +69,23 @@ class LeaderboardOut(BaseModel):
     ranking: list[LeaderboardItem] = Field(
         description="Top 10 amigos ordenados por ganho de XP na janela semanal"
     )
+
+
+# Re-exportacao de DTOs publicos para conformidade LGPD (Item 51)
+from app.schemas.privacidade import (  # noqa: E402
+    DesafioPublicoItem,
+    DesafioPublicoOut,
+    RankingPublicoItem,
+    RankingPublicoOut,
+)
+
+__all__ = [
+    "DesafioPublicoItem",
+    "DesafioPublicoOut",
+    "HistoricoXPOut",
+    "LeaderboardItem",
+    "LeaderboardOut",
+    "RankingPublicoItem",
+    "RankingPublicoOut",
+    "RegistroXPIn",
+]
