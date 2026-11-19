@@ -122,6 +122,25 @@ def conceder_xp(db: Session, paciente_id: int, quantidade: int, motivo: str) -> 
     return registro
 
 
+class IncentivoJaConcedido(GamificacaoError):
+    """O paciente ja recebeu o incentivo do nutricionista hoje."""
+
+
+def conceder_incentivo(db: Session, paciente_id: int) -> Paciente:
+    """+10 XP dado pelo nutricionista vinculado, no maximo uma vez por dia local.
+
+    Quem chama confere o vinculo ativo; aqui so vale a regra do limite diario.
+    """
+    paciente = _garantir_paciente(db, paciente_id)
+    motivo = f"incentivo:{hoje_local().isoformat()}"
+    if ja_recebeu(db, paciente_id, motivo):
+        raise IncentivoJaConcedido
+    registrar_xp(db, paciente, XP_INCENTIVO, motivo)
+    db.commit()
+    db.refresh(paciente)
+    return paciente
+
+
 def calcular_xp_semanal(
     db: Session, paciente_ids: list[int], inicio: datetime, fim: datetime
 ) -> dict[int, int]:
