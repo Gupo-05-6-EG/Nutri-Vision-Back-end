@@ -602,6 +602,7 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | GET | `/api/v1/gamificacao/ranking-publico?limite=` | Ranking semanal dos amigos do paciente logado expondo só nome, avatar, pontos e streak (RF29, RNF07) |
 | GET | `/api/v1/gamificacao/desafios/{id}/publico` | Placar de um desafio (só para quem participa) expondo só nome, avatar, pontos e streak (RF05.2, RF29) |
 | GET | `/api/v1/gamificacao/historico-xp` | Histórico auditável de XP do paciente logado (RF16) |
+| GET | `/api/v1/pacientes/{paciente_id}/perfil` | Perfil: triagem, IMC, TMB, meta diária única (plano ativo, senão triagem), XP, ofensiva e divisão (🔒 o próprio paciente ou nutricionista vinculado) |
 | POST | `/api/v1/pacientes/{paciente_id}/incentivo` | Nutricionista vinculado dá +10 XP de incentivo, uma vez por dia (🔒 nutricionista vinculado) |
 | GET | `/docs` | Swagger UI |
 

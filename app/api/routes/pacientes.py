@@ -9,12 +9,19 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, status
 from pydantic import BaseModel
 
-from app.api.deps import AcessoPropriaConta, exigir_perfil, garantir_acesso_ao_paciente
+from app.api.deps import (
+    AcessoAoPaciente,
+    AcessoPropriaConta,
+    exigir_perfil,
+    garantir_acesso_ao_paciente,
+)
 from app.db.deps import DbSession
 from app.models.usuario import Perfil, Usuario
 from app.schemas.paciente import TetoCaloricoOut, TriagemIn
+from app.schemas.perfil import PerfilPacienteOut
 from app.services import gamificacao
 from app.services import pacientes as servico
+from app.services import perfil as perfil_servico
 
 router = APIRouter(prefix="/pacientes", tags=["pacientes"])
 
@@ -65,3 +72,21 @@ def dar_incentivo(
     return IncentivoOut(
         paciente_id=paciente.id, xp_concedido=gamificacao.XP_INCENTIVO, xp_total=paciente.xp
     )
+
+
+@router.get(
+    "/{paciente_id}/perfil",
+    response_model=PerfilPacienteOut,
+    summary="Perfil do paciente: triagem, IMC, TMB, meta diaria unica e gamificacao",
+)
+def obter_perfil(
+    paciente_id: PacienteId, db: DbSession, acesso: AcessoAoPaciente
+) -> PerfilPacienteOut:
+    """O proprio paciente ou o nutricionista com vinculo ativo.
+
+    `meta` e a meta diaria que todas as telas usam: plano ativo, senao triagem.
+    """
+    try:
+        return perfil_servico.montar_perfil(db, paciente_id)
+    except perfil_servico.PacienteNaoEncontrado:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Paciente nao encontrado") from None

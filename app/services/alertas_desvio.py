@@ -24,11 +24,11 @@ from sqlalchemy.orm import Session
 from app.core.tempo import FUSO as FUSO_HORARIO
 from app.models.alerta_desvio import AlertaDesvioPlano, DirecaoDesvio, RegraAlertaDesvio
 from app.models.paciente import Paciente
-from app.models.plano_alimentar import PlanoAlimentar
 from app.models.refeicao import ItemRefeicao, Refeicao
 from app.models.usuario import Usuario
 from app.models.vinculo import StatusVinculo, Vinculo
 from app.schemas.alerta_desvio import AlertaDesvioOut, RegraAlertaDesvioIn, RegraAlertaDesvioOut
+from app.services.metas import meta_kcal_do_paciente
 
 logger = logging.getLogger(__name__)
 
@@ -101,23 +101,6 @@ def salvar_regra(
     return RegraAlertaDesvioOut.model_validate(regra)
 
 
-def _meta_kcal_do_paciente(db: Session, paciente: Paciente) -> Decimal | None:
-    """Prioriza a meta do plano alimentar ativo; se nao houver, usa a meta basal."""
-    plano = db.execute(
-        select(PlanoAlimentar).where(
-            PlanoAlimentar.paciente_id == paciente.id,
-            PlanoAlimentar.ativo.is_(True),
-        )
-    ).scalar_one_or_none()
-    if plano is not None:
-        meta_plano = plano.totais["meta_kcal"]
-        if meta_plano > 0:
-            return meta_plano
-    if paciente.meta_kcal is not None and paciente.meta_kcal > 0:
-        return Decimal(paciente.meta_kcal)
-    return None
-
-
 def _consumo_no_dia(db: Session, paciente_id: int, dia: date) -> tuple[int, Decimal]:
     """Retorna (quantidade_refeicoes, calorias_totais) do paciente no dia local."""
     inicio_utc = datetime.combine(dia, time.min, tzinfo=FUSO_HORARIO).astimezone(UTC)
@@ -151,7 +134,7 @@ def _avaliar_janela_paciente(
     Retorna `(direcao, meta_kcal, consumo_medio_kcal, percentual_medio_desvio)`
     quando o alerta deve ser disparado, ou `None` caso contrario.
     """
-    meta_kcal = _meta_kcal_do_paciente(db, paciente)
+    meta_kcal = meta_kcal_do_paciente(db, paciente)
     if meta_kcal is None or meta_kcal <= 0:
         return None
 
