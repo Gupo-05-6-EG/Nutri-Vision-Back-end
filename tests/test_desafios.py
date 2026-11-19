@@ -280,3 +280,32 @@ def test_unidade_do_placar_de_refeicoes_com_acento(client: TestClient, db: Sessi
     placar = client.get(f"{ROTA}/{desafio_id}/leaderboard", headers=_headers(1)).json()
 
     assert {p["unidade"] for p in placar["participantes"]} == {"dias com todas as refeições"}
+
+
+def test_placar_de_sequencia_usa_a_meta_do_plano(client: TestClient, db: Session) -> None:
+    """Triagem de 2.000 kcal, plano de 200 kcal: 2 x 100 kcal conta o dia (BE-16)."""
+    from app.models.plano_alimentar import PlanoAlimentar, RefeicaoPlano
+
+    primeiro = factories.criar_paciente(db, 1)
+    primeiro.meta_kcal = Decimal("2000")
+    db.add(
+        PlanoAlimentar(
+            paciente_id=1,
+            versao=1,
+            titulo="Plano",
+            ativo=True,
+            refeicoes=[
+                RefeicaoPlano(
+                    ordem=1, nome="Almoco", meta_kcal=Decimal("200"), meta_proteinas_g=Decimal("10")
+                )
+            ],
+        )
+    )
+    db.commit()
+    desafio_id = _criar_desafio(client, 1, tipo="sequencia_meta")
+    for hora, tipo in enumerate(list(TipoRefeicao)[:2], start=8):
+        _criar_refeicao(db, primeiro.id, tipo, hora)
+
+    placar = client.get(f"{ROTA}/{desafio_id}/leaderboard", headers=_headers(1)).json()
+
+    assert placar["participantes"][0]["pontuacao"] == 1

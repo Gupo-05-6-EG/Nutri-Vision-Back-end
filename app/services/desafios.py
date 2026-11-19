@@ -18,6 +18,7 @@ from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.models.usuario import Perfil, Usuario
 from app.services.gamificacao import cumpriu_meta_do_dia
+from app.services.metas import meta_do_paciente
 
 
 class DesafioNaoEncontrado(Exception):
@@ -199,11 +200,10 @@ def _pontuacoes(db: Session, desafio: Desafio, tipo: str) -> list[tuple[int, str
         refeicoes_por_dia[paciente_id][local.date()].add(refeicao_id)
         tipos_por_dia[paciente_id][local.date()].add(tipo_refeicao)
 
-    metas = dict(
-        db.execute(
-            select(Paciente.id, Paciente.meta_kcal).where(Paciente.id.in_(paciente_ids))
-        ).all()
-    )
+    metas = {
+        paciente.id: meta_do_paciente(db, paciente).kcal
+        for paciente in db.scalars(select(Paciente).where(Paciente.id.in_(paciente_ids)))
+    }
     resultado = []
     inicio_em = desafio.inicio_em
     fim_em = desafio.fim_em

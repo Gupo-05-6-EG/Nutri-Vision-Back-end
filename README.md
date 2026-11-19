@@ -371,7 +371,9 @@ As colunas são opcionais porque o cadastro cria o paciente antes da triagem.
 `streak` e `xp` guardam, respectivamente, os dias consecutivos que cumpriram a
 regra de gamificação e os pontos acumulados. O fechamento diário considera as
 refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo a
-até 30% de `meta_kcal` (para mais ou para menos), soma 1 ao streak e 50 XP. Quando a regra falha,
+até 30% da meta do dia (para mais ou para menos), soma 1 ao streak e 50 XP. A meta
+é a mesma que o app mostra: a do plano ativo do nutricionista e, sem plano, a da
+triagem (`meta_kcal`). Os desafios de meta usam a mesma regra. Quando a regra falha,
 consome um bloqueio se houver saldo e uma ofensiva ativa. Nesse caso, mantém
 o streak e o XP. Sem proteção, zera o streak.
 O fechamento não altera XP quando a regra não é cumprida. Pacientes sem meta
@@ -388,18 +390,25 @@ um registro em `historico_xp`, que alimenta o ranking semanal.
 | Dia dentro da meta (fechamento diário) | 50 |
 | Incentivo do nutricionista vinculado (uma vez por dia) | 10 |
 
-O job pode ser agendado pelo cron do ambiente para 23:59 (horário de São Paulo):
+**Agendamento.** No `docker compose up` o serviço `gamificacao` faz o papel do
+cron: ao subir, fecha os dias pendentes e depois fecha, todo dia às 00:05 de São
+Paulo (`GAMIFICACAO_HORARIO`), o dia que acabou. O dia só é fechado depois de
+terminar, então as refeições até 23:59 contam. Se o serviço ficar parado, ele
+recupera até 7 dias quando voltar.
+
+Sem Docker, agende o mesmo script pelo cron do ambiente:
 
 ```cron
 CRON_TZ=America/Sao_Paulo
-59 23 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_gamificacao
+5 0 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_gamificacao
 ```
 
-No Windows, configure o Agendador de Tarefas para executar diariamente às 23:59
+No Windows, configure o Agendador de Tarefas para executar diariamente às 00:05
 o interpretador `.venv\Scripts\python.exe`, com argumento
 `-m scripts.processar_gamificacao` e diretório de trabalho na raiz do projeto.
+Para refazer um dia específico: `python -m scripts.processar_gamificacao --dia 2026-11-19`.
 O campo `gamificacao_processada_em` impede crédito duplicado se o job for
-executado novamente no mesmo dia.
+executado de novo para o mesmo dia.
 
 No fechamento, o job concede as conquistas de 30 dias de ofensiva e 100
 refeições registradas. A conquista fica registrada mesmo se a ofensiva cair

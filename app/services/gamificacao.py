@@ -11,7 +11,7 @@ XP so vem de regras internas (a rota aberta POST /gamificacao/xp saiu):
 Todo ganho grava um HistoricoXP, que alimenta o ranking semanal.
 """
 
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select, update
@@ -25,6 +25,7 @@ from app.models.refeicao import ItemRefeicao, Refeicao
 from app.schemas.gamificacao import LeaderboardItem, LeaderboardOut
 from app.services import amizades as amizades_servico
 from app.services.conquistas import registrar_conquistas
+from app.services.metas import meta_do_paciente
 
 # Dia "dentro da meta": pelo menos 2 refeicoes e consumo a ate 30% da meta, para
 # mais ou para menos. (Antes a regra era consumo <= 30% DA meta: quem comia o
@@ -306,7 +307,9 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
     for paciente in pacientes:
         streak_anterior = paciente.streak
         quantidade, calorias = resultados.get(paciente.id, (0, Decimal(0)))
-        if cumpriu_meta_do_dia(paciente.meta_kcal, quantidade, calorias):
+        # Mesma meta que o app mostra: plano ativo do nutricionista, senao a triagem.
+        meta = meta_do_paciente(db, paciente).kcal
+        if cumpriu_meta_do_dia(meta, quantidade, calorias):
             paciente.streak += 1
             registrar_xp(db, paciente, XP_POR_DIA, f"meta_diaria:{dia.isoformat()}")
         elif paciente.streak > 0 and paciente.bloqueios_perda > 0:
@@ -320,6 +323,26 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
     registrar_conquistas(db, ofensivas)
     db.commit()
     return len(ofensivas)
+
+
+def fechar_dias_pendentes(
+    db: Session, ate: date | None = None, limite_dias: int = 7
+) -> list[tuple[date, int]]:
+    """Fecha, em ordem, os dias ainda nao processados ate `ate` (padrao: ontem).
+
+    O dia so e fechado depois que termina, para contar as refeicoes ate 23:59.
+    Se o agendador ficou parado, recupera ate `limite_dias` dias para tras.
+    """
+    ate = ate or hoje_local() - timedelta(days=1)
+    ultimo = db.scalar(select(func.min(Paciente.gamificacao_processada_em)))
+    inicio = ate if ultimo is None else ultimo + timedelta(days=1)
+    inicio = max(inicio, ate - timedelta(days=limite_dias - 1))
+    fechados = []
+    dia = inicio
+    while dia <= ate:
+        fechados.append((dia, processar_gamificacao_diaria(db, dia)))
+        dia += timedelta(days=1)
+    return fechados
 
 
 __all__ = ["FUSO_HORARIO", "hoje_local", "janela_semanal"]
