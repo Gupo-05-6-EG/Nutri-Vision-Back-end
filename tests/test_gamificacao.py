@@ -308,6 +308,7 @@ class TestLeaderboardSemanal:
             "posicao",
             "paciente_id",
             "username",
+            "nome",
             "xp_semanal",
             "streak",
             "e_voce",

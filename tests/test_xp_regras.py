@@ -84,3 +84,23 @@ def test_xp_de_refeicao_entra_no_ranking_semanal(client: TestClient, db: Session
     ranking = client.get("/api/v1/gamificacao/leaderboard", headers=headers).json()
 
     assert ranking["ranking"][0]["xp_semanal"] == XP_REFEICAO
+
+
+def test_cadastro_preenche_o_nome_social(client: TestClient, db: Session) -> None:
+    resposta = client.post("/api/v1/auth/cadastro/paciente", json=factories.cadastro())
+    paciente_id = resposta.json()["usuario"]["id"]
+    headers = {"Authorization": f"Bearer {resposta.json()['access_token']}"}
+
+    ranking = client.get("/api/v1/gamificacao/leaderboard", headers=headers).json()
+
+    assert db.get(Paciente, paciente_id).nome == "Ana Souza"
+    assert ranking["ranking"][0]["nome"] == "Ana S."
+
+
+def test_nome_social() -> None:
+    from app.services.gamificacao import nome_social
+
+    assert nome_social("Maria da Silva Souza") == "Maria S."
+    assert nome_social("Cher") == "Cher"
+    assert nome_social("  ") is None
+    assert nome_social(None) is None

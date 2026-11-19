@@ -39,6 +39,16 @@ XP_INCENTIVO = 10
 CUSTO_BLOQUEIO_XP = 100
 
 
+def nome_social(nome: str | None) -> str | None:
+    """Nome exibido no ranking: primeiro nome e inicial do ultimo ("Maria S.")."""
+    partes = (nome or "").split()
+    if not partes:
+        return None
+    if len(partes) == 1:
+        return partes[0]
+    return f"{partes[0]} {partes[-1][0].upper()}."
+
+
 def cumpriu_meta_do_dia(meta_kcal: Decimal | None, refeicoes: int, calorias: Decimal) -> bool:
     """Regra unica do dia dentro da meta (ofensiva e desafio `sequencia_meta`)."""
     if meta_kcal is None or meta_kcal <= 0 or refeicoes < MINIMO_REFEICOES_NO_DIA:
@@ -206,6 +216,7 @@ def obter_leaderboard_semanal(
             {
                 "paciente_id": pid,
                 "username": paciente.username if paciente else None,
+                "nome": nome_social(paciente.nome) if paciente else None,
                 "streak": paciente.streak if paciente else 0,
                 "xp_semanal": totais_xp.get(pid, 0),
             }
@@ -227,6 +238,7 @@ def obter_leaderboard_semanal(
                     posicao=idx,
                     paciente_id=c["paciente_id"],
                     username=c["username"],
+                    nome=c["nome"],
                     xp_semanal=c["xp_semanal"],
                     streak=c["streak"],
                     e_voce=(c["paciente_id"] == paciente_id),

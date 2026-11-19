@@ -56,7 +56,7 @@ def _salvar(db: Session, usuario: Usuario) -> Usuario:
 def cadastrar_paciente(db: Session, dados: CadastroPacienteIn) -> Usuario:
     """Cria o usuario e o paciente vazio (a triagem preenche depois)."""
     usuario = _novo_usuario(db, dados, Perfil.PACIENTE)
-    paciente = Paciente(id=usuario.id, xp=0)
+    paciente = Paciente(id=usuario.id, nome=usuario.nome[:100], xp=0)
     db.add(paciente)
     registrar_xp(db, paciente, XP_BOAS_VINDAS, "boas_vindas")
     return _salvar(db, usuario)

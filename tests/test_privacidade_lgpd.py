@@ -232,12 +232,12 @@ class TestConformidadePrivacidadeEndpoints:
         assert dados["total_participantes"] >= 2
 
         # Encontra o registro correspondente ao paciente com dados clinicos
-        item_lucas = next((it for it in dados["ranking"] if it["nome"] == "Lucas Silva"), None)
+        item_lucas = next((it for it in dados["ranking"] if it["nome"] == "Lucas S."), None)
         assert item_lucas is not None
 
         # Verifica campos autorizados
         assert set(item_lucas.keys()) == {"nome", "avatar", "pontos", "streak"}
-        assert item_lucas["nome"] == "Lucas Silva"
+        assert item_lucas["nome"] == "Lucas S."
         assert item_lucas["avatar"] == "https://cdn.nutrivision.app/avatars/lucas.png"
         assert item_lucas["pontos"] == 100
         assert item_lucas["streak"] == 12
@@ -297,7 +297,7 @@ class TestConformidadePrivacidadeEndpoints:
         assert dados["desafio_id"] == desafio.id
         assert dados["titulo"] == "Desafio 7 Dias"
         assert dados["total_participantes"] == 2
-        assert {p["nome"] for p in dados["participantes"]} == {"Lucas Silva", "Camila Souza"}
+        assert {p["nome"] for p in dados["participantes"]} == {"Lucas S.", "Camila S."}
 
         for part in dados["participantes"]:
             assert set(part.keys()) == {"nome", "avatar", "pontos", "streak"}

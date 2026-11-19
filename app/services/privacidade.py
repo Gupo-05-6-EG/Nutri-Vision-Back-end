@@ -269,4 +269,4 @@ def obter_desafio_publico(db: Session, desafio_id: int, solicitante_id: int) -> 
 def _nome_publico(paciente: Paciente | None) -> str | None:
     if paciente is None:
         return None
-    return paciente.nome or paciente.username
+    return gamificacao_servico.nome_social(paciente.nome) or paciente.username

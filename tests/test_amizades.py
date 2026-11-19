@@ -203,6 +203,8 @@ class TestListagemAmizades:
         assert len(itens_aceitos) == 1
         assert itens_aceitos[0]["paciente_id"] == paciente_b.id
         assert itens_aceitos[0]["username"] == "maria_fit"
+        assert itens_aceitos[0]["nome"] == "Paciente 2"
+        assert itens_aceitos[0]["xp"] == 300
 
 
 class TestRemoverAmizade:

@@ -138,8 +138,10 @@ def listar_amizades(
             AmigoItem(
                 id=reg.id,
                 paciente_id=outro_id,
+                nome=outro.nome if outro else None,
                 username=outro.username if outro else None,
                 streak=outro.streak if outro else 0,
+                xp=outro.xp if outro else 0,
                 status=StatusAmizade(reg.status),
                 sou_solicitante=(reg.pac_id == paciente_id),
                 criado_em=reg.criado_em,

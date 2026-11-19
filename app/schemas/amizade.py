@@ -36,8 +36,10 @@ class AmigoItem(BaseModel):
 
     id: int = Field(description="Id da amizade")
     paciente_id: int = Field(description="Id do outro paciente")
+    nome: str | None = Field(default=None, description="Nome do outro paciente")
     username: str | None = Field(default=None, description="Nome de usuario publico")
     streak: int = Field(default=0, description="Dias consecutivos de ofensiva")
+    xp: int = Field(default=0, description="XP total do outro paciente")
     status: StatusAmizade
     sou_solicitante: bool = Field(
         description="True se o paciente solicitou o convite, False se recebeu"

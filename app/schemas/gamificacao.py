@@ -27,6 +27,7 @@ class LeaderboardItem(BaseModel):
     posicao: int = Field(ge=1, description="Posicao no ranking (1 a 10)")
     paciente_id: int = Field(gt=0, description="Identificador do paciente")
     username: str | None = Field(default=None, description="Nome de usuario exclusivo")
+    nome: str | None = Field(default=None, description='Nome social, ex.: "Maria S."')
     xp_semanal: int = Field(ge=0, description="XP ganho dentro da janela semanal vigente")
     streak: int = Field(ge=0, description="Dias consecutivos de ofensiva ativa")
     e_voce: bool = Field(default=False, description="Flag indicando se o registro e do solicitante")
