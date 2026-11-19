@@ -3,11 +3,11 @@
 from collections import defaultdict
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tempo import FUSO as FUSO_HORARIO
 from app.models.desafio import (
     Desafio,
     ParticipanteDesafio,
@@ -18,7 +18,6 @@ from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.models.usuario import Perfil, Usuario
 
-FUSO_HORARIO = ZoneInfo("America/Sao_Paulo")
 PERCENTUAL_TOLERANCIA_META = Decimal("0.30")
 
 

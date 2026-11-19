@@ -42,22 +42,22 @@ def paciente_principal(db: Session) -> Paciente:
 
 
 class TestJanelaSemanal:
-    def test_calcula_segunda_a_domingo_utc(self) -> None:
-        # 2026-10-28 é uma quarta-feira
+    def test_calcula_segunda_a_domingo_no_fuso_local(self) -> None:
+        # 2026-10-28 e uma quarta-feira
         quarta = datetime(2026, 10, 28, 14, 30, tzinfo=UTC)
         inicio, fim = janela_semanal(quarta)
 
-        # Segunda-feira: 2026-10-26 00:00:00
-        assert inicio.year == 2026
-        assert inicio.month == 10
-        assert inicio.day == 26
-        assert inicio.hour == 0 and inicio.minute == 0 and inicio.second == 0
+        # Segunda 2026-10-26 00:00 e domingo 2026-11-01 23:59:59 em Sao Paulo
+        assert inicio.astimezone(FUSO_HORARIO) == datetime(2026, 10, 26, tzinfo=FUSO_HORARIO)
+        assert inicio.tzinfo == UTC
+        fim_local = fim.astimezone(FUSO_HORARIO)
+        assert (fim_local.date(), fim_local.hour, fim_local.minute) == (date(2026, 11, 1), 23, 59)
 
-        # Domingo: 2026-11-01 23:59:59
-        assert fim.year == 2026
-        assert fim.month == 11
-        assert fim.day == 1
-        assert fim.hour == 23 and fim.minute == 59 and fim.second == 59
+    def test_domingo_a_noite_ainda_e_a_mesma_semana(self) -> None:
+        # Domingo 22h em Sao Paulo ja e segunda em UTC (B5)
+        domingo = datetime(2026, 11, 1, 22, 0, tzinfo=FUSO_HORARIO)
+        inicio, _ = janela_semanal(domingo)
+        assert inicio.astimezone(FUSO_HORARIO).date() == date(2026, 10, 26)
 
 
 class TestConcessaoXP:

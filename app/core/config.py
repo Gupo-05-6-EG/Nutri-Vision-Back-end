@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # producao (atras de proxy, o proxy tem que mandar X-Forwarded-Proto).
     HTTPS_ONLY: bool = False
 
+    # Fuso oficial: recorte do "dia" de consumo, semana do ranking, lembretes (B5)
+    APP_TIMEZONE: str = "America/Sao_Paulo"
+
     # Vinculacao paciente-nutricionista (Task 1.4)
     LINKING_CODE_EXPIRE_MINUTES: int = 60 * 24
 

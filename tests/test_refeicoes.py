@@ -5,6 +5,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.tempo import FUSO
 from tests import factories
 
 ROTA = "/api/v1/refeicoes"
@@ -159,13 +160,23 @@ class TestHistorico:
         assert [r["id"] for r in corpo] == [recente["id"], antiga["id"]]
 
     def test_filtra_por_dia(self, client: TestClient) -> None:
-        _criar(client, consumida_em=datetime(2026, 9, 18, 23, 30, tzinfo=UTC))
-        do_dia = _criar(client, consumida_em=datetime(2026, 9, 19, 8, 0, tzinfo=UTC))
-        _criar(client, consumida_em=datetime(2026, 9, 20, 0, 30, tzinfo=UTC))
+        _criar(client, consumida_em=datetime(2026, 9, 18, 23, 30, tzinfo=FUSO))
+        do_dia = _criar(client, consumida_em=datetime(2026, 9, 19, 8, 0, tzinfo=FUSO))
+        _criar(client, consumida_em=datetime(2026, 9, 20, 0, 30, tzinfo=FUSO))
 
         corpo = client.get(ROTA, params={"paciente_id": 1, "data": "2026-09-19"}).json()
 
         assert [r["id"] for r in corpo] == [do_dia["id"]]
+
+    def test_dia_e_contado_no_fuso_local(self, client: TestClient) -> None:
+        """Jantar as 21:30 em Sao Paulo (00:30 UTC do dia seguinte) e do proprio dia (B5)."""
+        jantar = _criar(client, consumida_em=datetime(2026, 9, 20, 0, 30, tzinfo=UTC))
+
+        dia_19 = client.get(ROTA, params={"paciente_id": 1, "data": "2026-09-19"}).json()
+        dia_20 = client.get(ROTA, params={"paciente_id": 1, "data": "2026-09-20"}).json()
+
+        assert [r["id"] for r in dia_19] == [jantar["id"]]
+        assert dia_20 == []
 
     def test_pagina_os_resultados(self, client: TestClient) -> None:
         base = datetime(2026, 9, 19, 8, 0, tzinfo=UTC)

@@ -885,8 +885,11 @@ o app e o painel não precisarem fazer parse de texto em campo numérico.
 ### Fusos horários
 
 Todos os instantes são gravados e devolvidos em **UTC**, sempre com offset no
-JSON. O agrupamento por dia usa o dia em UTC — a conversão para o fuso do
-paciente fica no app e no painel.
+JSON. O **dia** (histórico, consumo diário, dashboard, alertas, ofensiva), a
+**semana** do ranking e a sugestão do tipo de refeição usam o fuso oficial
+`APP_TIMEZONE` (padrão `America/Sao_Paulo`, ver `app/core/tempo.py`): um jantar
+às 21h30 em São Paulo é gravado como 00h30 UTC do dia seguinte, mas conta no
+próprio dia.
 
 ## Documentação Técnica do Sistema
 

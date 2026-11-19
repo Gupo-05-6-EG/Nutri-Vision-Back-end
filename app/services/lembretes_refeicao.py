@@ -17,12 +17,12 @@ from datetime import UTC, date, datetime, time, timedelta
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
+from app.core.tempo import FUSO as FUSO_HORARIO
 from app.models.lembrete_refeicao import DispositivoPush, LembreteRefeicao
 from app.models.paciente import Paciente
 from app.models.refeicao import Refeicao, TipoRefeicao
 from app.schemas.lembrete_refeicao import LembretesIn
 from app.services.fcm import ResultadoPush
-from app.services.gamificacao import FUSO_HORARIO
 
 # Inicio (hora local) da faixa de cada refeicao, alinhado a categorizacao do RF19.
 JANELA_INICIO: dict[TipoRefeicao, time] = {

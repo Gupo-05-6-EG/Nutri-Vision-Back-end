@@ -1,12 +1,13 @@
 """Processamento diario de streak/XP e Leaderboard Semanal (RF05, RF16, RF29)."""
 
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, time
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
+from app.core.tempo import FUSO as FUSO_HORARIO
+from app.core.tempo import hoje_local, janela_semanal
 from app.models.historico_xp import HistoricoXP
 from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao
@@ -14,7 +15,6 @@ from app.schemas.gamificacao import LeaderboardItem, LeaderboardOut
 from app.services import amizades as amizades_servico
 from app.services.conquistas import registrar_conquistas
 
-FUSO_HORARIO = ZoneInfo("America/Sao_Paulo")
 PERCENTUAL_MAXIMO_DA_META = Decimal("0.30")
 XP_POR_DIA = 50
 CUSTO_BLOQUEIO_XP = 100
@@ -46,16 +46,6 @@ def _garantir_paciente(db: Session, paciente_id: int) -> Paciente:
     if not paciente:
         raise PacienteNaoEncontrado(f"Paciente {paciente_id} nao encontrado")
     return paciente
-
-
-def janela_semanal(referencia: datetime | None = None) -> tuple[datetime, datetime]:
-    """Calcula limites em UTC da janela semanal vigente (Segunda 00:00 a Domingo 23:59:59)."""
-    agora = (referencia or datetime.now(UTC)).astimezone(UTC)
-    inicio = (agora - timedelta(days=agora.weekday())).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
-    fim = inicio + timedelta(days=6, hours=23, minutes=59, seconds=59, microseconds=999999)
-    return inicio, fim
 
 
 def conceder_xp(db: Session, paciente_id: int, quantidade: int, motivo: str) -> HistoricoXP:
@@ -249,6 +239,4 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
     return len(ofensivas)
 
 
-def hoje_local() -> date:
-    """Data corrente no fuso oficial usado pelo processamento diário."""
-    return datetime.now(FUSO_HORARIO).date()
+__all__ = ["FUSO_HORARIO", "hoje_local", "janela_semanal"]

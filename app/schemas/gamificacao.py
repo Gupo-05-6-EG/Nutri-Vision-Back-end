@@ -49,9 +49,9 @@ class LeaderboardOut(BaseModel):
     """Leaderboard de amigos com base no XP acumulado na janela semanal."""
 
     inicio_semana: datetime = Field(
-        description="Inicio da janela semanal em UTC (Segunda-feira 00:00)"
+        description="Inicio da semana local (segunda-feira 00:00), em UTC"
     )
-    fim_semana: datetime = Field(description="Fim da janela semanal em UTC (Domingo 23:59:59)")
+    fim_semana: datetime = Field(description="Fim da semana local (domingo 23:59:59), em UTC")
     total_participantes: int = Field(
         ge=0, description="Total de participantes avaliados na rede do paciente"
     )

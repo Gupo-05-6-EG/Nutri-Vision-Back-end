@@ -21,6 +21,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from app.core.tempo import FUSO as FUSO_HORARIO
 from app.models.alerta_desvio import AlertaDesvioPlano, DirecaoDesvio, RegraAlertaDesvio
 from app.models.paciente import Paciente
 from app.models.plano_alimentar import PlanoAlimentar
@@ -28,7 +29,6 @@ from app.models.refeicao import ItemRefeicao, Refeicao
 from app.models.usuario import Usuario
 from app.models.vinculo import StatusVinculo, Vinculo
 from app.schemas.alerta_desvio import AlertaDesvioOut, RegraAlertaDesvioIn, RegraAlertaDesvioOut
-from app.services.gamificacao import FUSO_HORARIO
 
 logger = logging.getLogger(__name__)
 
