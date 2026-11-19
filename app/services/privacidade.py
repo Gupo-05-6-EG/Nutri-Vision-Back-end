@@ -10,16 +10,27 @@ from sqlalchemy.orm import Session, selectinload
 from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.consentimento import Consentimento
 from app.models.desafio import Desafio, ParticipanteDesafio, StatusParticipante
+from app.models.historico_xp import HistoricoXP
 from app.models.paciente import Paciente
 from app.models.refeicao import Refeicao
 from app.models.usuario import Perfil, Usuario
 from app.models.vinculo import Vinculo
+from app.schemas.alimento_personalizado import AlimentoPersonalizadoOut
+from app.schemas.exportacao import (
+    ExportacaoDadosOut,
+    HistoricoXPExportado,
+    PacienteExportado,
+    UsuarioExportado,
+    VinculoExportado,
+)
 from app.schemas.privacidade import (
+    ConsentimentoOut,
     DesafioPublicoItem,
     DesafioPublicoOut,
     RankingPublicoItem,
     RankingPublicoOut,
 )
+from app.schemas.refeicao import RefeicaoOut
 from app.services import amizades as amizades_servico
 from app.services import gamificacao as gamificacao_servico
 
@@ -83,40 +94,54 @@ def revogar_consentimento(db: Session, usuario_id: int) -> Consentimento | None:
     return consentimento
 
 
-def exportar_dados(db: Session, usuario: Usuario) -> dict[str, object]:
-    consentimentos = listar_consentimentos(db, usuario.id)
-    dados: dict[str, object] = {
-        "usuario": {
-            "id": usuario.id,
-            "nome": usuario.nome,
-            "email": usuario.email,
-            "perfil": usuario.perfil,
-            "criado_em": usuario.criado_em,
-        },
-        "consentimentos": consentimentos,
-    }
+def exportar_dados(db: Session, usuario: Usuario) -> ExportacaoDadosOut:
+    """Monta a exportacao do titular com schemas (nada de objeto do banco na resposta)."""
+    consentimentos = [
+        ConsentimentoOut(
+            versao_termo=c.versao_termo, aceito_em=c.aceito_em, revogado_em=c.revogado_em
+        )
+        for c in listar_consentimentos(db, usuario.id)
+    ]
+    dados = ExportacaoDadosOut(
+        gerado_em=datetime.now(UTC),
+        usuario=UsuarioExportado.model_validate(usuario),
+        consentimentos=consentimentos,
+        vinculos=[],
+    )
     if usuario.perfil == Perfil.PACIENTE:
         paciente = db.get(Paciente, usuario.id)
-        dados["paciente"] = paciente
+        if paciente is not None:
+            dados.paciente = PacienteExportado.model_validate(paciente)
         refeicoes = db.scalars(
             select(Refeicao)
             .where(Refeicao.paciente_id == usuario.id)
             .options(selectinload(Refeicao.itens))
             .order_by(Refeicao.consumida_em, Refeicao.id)
         ).all()
-        dados["refeicoes"] = refeicoes
-        dados["alimentos_personalizados"] = db.scalars(
-            select(AlimentoPersonalizado)
-            .where(AlimentoPersonalizado.paciente_id == usuario.id)
-            .order_by(AlimentoPersonalizado.id)
-        ).all()
-        dados["vinculos"] = db.scalars(
-            select(Vinculo).where(Vinculo.paciente_id == usuario.id).order_by(Vinculo.id)
-        ).all()
+        dados.refeicoes = [RefeicaoOut.model_validate(r) for r in refeicoes]
+        dados.alimentos_personalizados = [
+            AlimentoPersonalizadoOut.model_validate(a)
+            for a in db.scalars(
+                select(AlimentoPersonalizado)
+                .where(AlimentoPersonalizado.paciente_id == usuario.id)
+                .order_by(AlimentoPersonalizado.id)
+            )
+        ]
+        dados.historico_xp = [
+            HistoricoXPExportado.model_validate(h)
+            for h in db.scalars(
+                select(HistoricoXP)
+                .where(HistoricoXP.paciente_id == usuario.id)
+                .order_by(HistoricoXP.criado_em, HistoricoXP.id)
+            )
+        ]
+        filtro_vinculo = Vinculo.paciente_id == usuario.id
     else:
-        dados["vinculos"] = db.scalars(
-            select(Vinculo).where(Vinculo.nutricionista_id == usuario.id).order_by(Vinculo.id)
-        ).all()
+        filtro_vinculo = Vinculo.nutricionista_id == usuario.id
+    dados.vinculos = [
+        VinculoExportado.model_validate(v)
+        for v in db.scalars(select(Vinculo).where(filtro_vinculo).order_by(Vinculo.id))
+    ]
     return dados
 
 

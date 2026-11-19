@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 from app.api.deps import UsuarioAtual
 from app.db.deps import DbSession
 from app.models.consentimento import Consentimento
+from app.schemas.exportacao import ExportacaoDadosOut
 from app.schemas.privacidade import (
     ConsentimentoIn,
     ConsentimentoOut,
@@ -56,8 +57,12 @@ def revogar_consentimento(usuario: UsuarioAtual, db: DbSession) -> Consentimento
     return _consentimento_out(item)
 
 
-@router.get("/dados", summary="Exporta os dados pessoais do titular")
-def exportar_dados(usuario: UsuarioAtual, db: DbSession) -> dict[str, object]:
+@router.get(
+    "/dados",
+    response_model=ExportacaoDadosOut,
+    summary="Exporta os dados pessoais do titular (LGPD, art. 18)",
+)
+def exportar_dados(usuario: UsuarioAtual, db: DbSession) -> ExportacaoDadosOut:
     return servico.exportar_dados(db, usuario)
 
 
