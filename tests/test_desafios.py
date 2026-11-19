@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -124,6 +125,15 @@ def test_nutricionista_nao_pode_criar_desafio(client: TestClient, db: Session) -
         },
     )
     assert resposta.status_code == 403
+
+
+@pytest.fixture(autouse=True)
+def _todos_sao_amigos(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Aqui se testa a mecanica do desafio; a regra "so amigos" esta em test_desafios_amizade."""
+    monkeypatch.setattr(
+        "app.services.desafios.amizades_servico.obter_ids_amigos_aceitos",
+        lambda _db, _paciente_id: list(range(1, 100)),
+    )
 
 
 def _criar_desafio(

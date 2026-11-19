@@ -17,6 +17,7 @@ from app.models.desafio import (
 from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.models.usuario import Perfil, Usuario
+from app.services import amizades as amizades_servico
 from app.services.gamificacao import cumpriu_meta_do_dia
 from app.services.metas import meta_do_paciente
 
@@ -33,10 +34,14 @@ class ConviteInvalido(Exception):
     pass
 
 
-def _garantir_pacientes(db: Session, ids: list[int]) -> None:
+def _garantir_pacientes(db: Session, ids: list[int], convidador_id: int) -> None:
     if len(set(ids)) != len(ids):
         raise ConviteInvalido
     if ids and len(db.scalars(select(Paciente.id).where(Paciente.id.in_(ids))).all()) != len(ids):
+        raise ConviteInvalido
+    # So amigos aceitos podem ser convidados: sem isso, qualquer id de paciente
+    # receberia convite (e notificacao) de um desconhecido.
+    if not set(ids) <= set(amizades_servico.obter_ids_amigos_aceitos(db, convidador_id)):
         raise ConviteInvalido
 
 
@@ -50,7 +55,7 @@ def criar_desafio(db: Session, usuario: Usuario, dados) -> Desafio:
     ids = [paciente_id for paciente_id in dados.convidados if paciente_id != usuario.id]
     if len(ids) != len(dados.convidados):
         raise ConviteInvalido
-    _garantir_pacientes(db, ids)
+    _garantir_pacientes(db, ids, usuario.id)
 
     desafio = Desafio(
         criador_id=usuario.id,
@@ -92,7 +97,7 @@ def convidar(
         raise SemPermissaoDesafio
     if usuario.id in ids:
         raise ConviteInvalido
-    _garantir_pacientes(db, ids)
+    _garantir_pacientes(db, ids, usuario.id)
     existentes = (
         set(
             db.scalars(
