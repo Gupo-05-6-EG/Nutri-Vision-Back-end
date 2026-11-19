@@ -13,11 +13,11 @@ Nada e gravado aqui: o paciente revisa os itens e registra a refeicao em
 no servico de IA depois de 24 h. So pacientes analisam fotos.
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 from uuid import UUID
 
 import httpx
-from fastapi import APIRouter, Depends, File, HTTPException, Path, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Path, UploadFile, status
 
 from app.api.deps import exigir_perfil
 from app.core.config import get_settings
@@ -60,11 +60,19 @@ def enviar_foto(
     _paciente: PacienteAtual,
     cliente: ClienteIA,
     file: Annotated[UploadFile, File(description="Foto da refeicao (JPEG, PNG, WebP, HEIC...)")],
+    tipo_prato: Annotated[
+        Literal["raso", "fundo"] | None,
+        Form(description="Tipo de prato escolhido na camera: ajuda a IA a estimar as gramas"),
+    ] = None,
 ) -> AnaliseCriadaOut:
     conteudo = _ler_foto(file)
     try:
         analise = ia_cliente.enviar_foto(
-            cliente, conteudo, file.filename or "foto", file.content_type or "image/jpeg"
+            cliente,
+            conteudo,
+            file.filename or "foto",
+            file.content_type or "image/jpeg",
+            tipo_prato=tipo_prato,
         )
     except ia_cliente.FotoRecusada as erro:
         raise HTTPException(erro.status_code, erro.detalhe) from None

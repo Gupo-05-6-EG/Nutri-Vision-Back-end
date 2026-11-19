@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.texto import sem_acento
-from app.models.usuario import Perfil, Usuario
+from app.models.usuario import Nutricionista, Perfil, Usuario
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, StatusVinculo, Vinculo
 
 
@@ -146,6 +146,21 @@ def _buscar_codigo_ativo(db: Session, codigo: str) -> CodigoVinculacao | None:
     except Exception:
         pass
     return db.execute(stmt).scalar_one_or_none()
+
+
+def previa_do_codigo(db: Session, codigo: str) -> tuple[CodigoVinculacao, Nutricionista] | None:
+    """Codigo ativo e dentro da validade, com o nutricionista dono. Nao resgata nada."""
+    registro = db.execute(
+        select(CodigoVinculacao).where(CodigoVinculacao.codigo_hash == _hash_codigo(codigo))
+    ).scalar_one_or_none()
+    if registro is None or registro.status != StatusCodigoVinculacao.ATIVO.value:
+        return None
+    if _em_utc(registro.expira_em) <= _agora():
+        return None
+    nutricionista = db.get(Nutricionista, registro.nutricionista_id)
+    if nutricionista is None:
+        return None
+    return registro, nutricionista
 
 
 def resgatar_codigo_vinculacao(db: Session, usuario: Usuario, codigo: str) -> VinculoResgatado:

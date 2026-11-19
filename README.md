@@ -148,6 +148,7 @@ no caminho, na query ou no corpo, e é conferido contra o token:
 | Triagem, lembretes, token de push, registrar/editar/remover refeição, cadastrar alimento personalizado | só o próprio paciente |
 | Gerar código de vinculação (`/linking-code`) | só nutricionista |
 | Resgatar código (`/link`) | só paciente |
+| Prévia do código (`/linking-code/{codigo}/previa`) | qualquer um (o paciente ainda não tem conta); só nome e CRN do profissional |
 | Busca na TACO (`/alimentos-taco`, `/alimentos` sem `paciente_id`) e `/calculo-nutricional` | qualquer usuário logado |
 | Análise de fotos pela IA (`/analises`) | só pacientes |
 | Gamificação e amizades (`/gamificacao/*`, `/amizades/*`) | só paciente, sempre em nome de quem está logado (o id vem do token) |
@@ -568,6 +569,7 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | POST | `/api/v1/link` | Paciente resgata um codigo e cria uma solicitacao pendente |
 | POST | `/api/v1/link/{nutricionista_id}/aceitar` | Paciente aceita a solicitacao de vinculo |
 | POST | `/api/v1/link/{nutricionista_id}/recusar` | Paciente recusa a solicitacao de vinculo |
+| GET | `/api/v1/linking-code/{codigo}/previa` | Nome e CRN de quem gerou um código válido, para o paciente conferir antes de criar a conta (sem login; inválido ou expirado = 404) |
 | GET | `/api/v1/patients?busca=&status=` | Pacientes do nutricionista; `status` = `ativo` (padrão), `pendente` (resgatou o código e não aceitou) ou `todos` |
 | GET | `/api/v1/nutricionista/visao-geral?status=&busca=&pagina=&por_pagina=` | Visão geral da carteira: indicadores (ativos, pendentes, alertas críticos, adesão média, ofensiva média) e monitoramento por paciente (meta, consumo de hoje, adesão semanal, ofensiva, último registro, situação) (🔒 nutricionista) |
 | DELETE | `/api/v1/patients/{paciente_id}` | Nutricionista encerra o vinculo ativo |
@@ -596,7 +598,7 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
-| POST | `/api/v1/analises` | Envia a foto do prato para a IA analisar (multipart `file`, 🔒 paciente) |
+| POST | `/api/v1/analises` | Envia a foto do prato para a IA analisar (multipart `file` e, opcional, `tipo_prato` = `raso`/`fundo` como dica para as gramas; 🔒 paciente) |
 | GET | `/api/v1/analises/{id}` | Andamento e resultado da análise: alimentos da TACO com kcal/macros das gramas estimadas (🔒 paciente) |
 | POST | `/api/v1/calculo-nutricional` | Calcula kcal/macros por porção, por id da TACO ou classe da IA (RF03, RF20, RF21) |
 | POST | `/api/v1/amizades` | Convida outro paciente pelo e-mail exato com que ele se cadastrou (`{"email": ...}`, RF05) |

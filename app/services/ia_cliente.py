@@ -64,16 +64,29 @@ def _requisitar(cliente: httpx.Client, metodo: str, url: str, **kwargs: Any) -> 
     return resposta
 
 
+# Tipo de prato escolhido na camera do app -> valor aceito pelo servico de IA.
+TIPOS_DE_PRATO = {"raso": "shallow", "fundo": "deep"}
+
+
 def enviar_foto(
-    cliente: httpx.Client, conteudo: bytes, nome_arquivo: str, content_type: str
+    cliente: httpx.Client,
+    conteudo: bytes,
+    nome_arquivo: str,
+    content_type: str,
+    tipo_prato: str | None = None,
 ) -> dict[str, Any]:
     """Envia a foto para analise. Devolve `{id, status}` (e `reason`/`issues` se a
-    foto ja for recusada na checagem de qualidade)."""
+    foto ja for recusada na checagem de qualidade).
+
+    `tipo_prato` (raso/fundo) vai como dica para a IA estimar melhor as gramas.
+    """
+    dados = {"plate_type": TIPOS_DE_PRATO[tipo_prato]} if tipo_prato else None
     resposta = _requisitar(
         cliente,
         "POST",
         ROTA_ANALISES,
         files={"file": (nome_arquivo, conteudo, content_type)},
+        data=dados,
     )
     if resposta.status_code in (413, 415, 422):
         raise FotoRecusada(resposta.status_code, _detalhe(resposta))
