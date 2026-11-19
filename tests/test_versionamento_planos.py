@@ -31,7 +31,7 @@ def _usuarios(db: Session) -> None:
     factories.criar_nutricionista(db, OUTRO_NUTRI, nome="Dr. Bruno")
     factories.criar_paciente(db, PACIENTE)
     factories.criar_paciente(db, OUTRO_PACIENTE)
-    db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=PACIENTE))
+    db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=PACIENTE, status="ativo"))
     db.commit()
 
 
@@ -76,7 +76,7 @@ class TestNumeracao:
         assert versoes == [1, 2, 3]
 
     def test_a_numeracao_e_por_paciente(self, client: TestClient, db: Session) -> None:
-        db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=OUTRO_PACIENTE))
+        db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=OUTRO_PACIENTE, status="ativo"))
         db.commit()
 
         _salvar(client, _plano("A1"), PACIENTE)
@@ -153,7 +153,7 @@ class TestHistorico:
         assert _historico(client) == []
 
     def test_nao_mistura_versoes_de_outro_paciente(self, client: TestClient, db: Session) -> None:
-        db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=OUTRO_PACIENTE))
+        db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=OUTRO_PACIENTE, status="ativo"))
         db.commit()
         _salvar(client, _plano("Do Joao"), PACIENTE)
         _salvar(client, _plano("Da Maria"), OUTRO_PACIENTE)
@@ -163,7 +163,7 @@ class TestHistorico:
 
 class TestAutor:
     def test_cada_versao_traz_quem_a_salvou(self, client: TestClient, db: Session) -> None:
-        db.add(Vinculo(nutricionista_id=OUTRO_NUTRI, paciente_id=PACIENTE))
+        db.add(Vinculo(nutricionista_id=OUTRO_NUTRI, paciente_id=PACIENTE, status="ativo"))
         db.commit()
         _salvar(client, _plano("Da Ana"), headers=NUTRI_HEADERS)
         _salvar(client, _plano("Do Bruno"), headers=OUTRO_NUTRI_HEADERS)
@@ -175,7 +175,7 @@ class TestAutor:
         assert da_ana["nutricionista_id"] == NUTRI
 
     def test_autor_nulo_quando_a_conta_foi_removida(self, client: TestClient, db: Session) -> None:
-        db.add(Vinculo(nutricionista_id=OUTRO_NUTRI, paciente_id=PACIENTE))
+        db.add(Vinculo(nutricionista_id=OUTRO_NUTRI, paciente_id=PACIENTE, status="ativo"))
         db.commit()
         _salvar(client, _plano("Da Ana"), headers=NUTRI_HEADERS)
         db.execute(delete(Usuario).where(Usuario.id == NUTRI))

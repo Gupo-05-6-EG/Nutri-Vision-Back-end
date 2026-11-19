@@ -35,7 +35,7 @@ def _usuarios(db: Session) -> None:
     factories.criar_nutricionista(db, OUTRO_NUTRI)
     factories.criar_paciente(db, PACIENTE)
     factories.criar_paciente(db, OUTRO_PACIENTE)
-    db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=PACIENTE))
+    db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=PACIENTE, status="ativo"))
     db.commit()
 
 

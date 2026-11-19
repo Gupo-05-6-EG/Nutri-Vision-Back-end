@@ -10,9 +10,9 @@ from app.models.auditoria import EntidadeAuditada
 from app.models.paciente import Paciente
 from app.models.plano_alimentar import AlimentoRefeicaoPlano, PlanoAlimentar, RefeicaoPlano
 from app.models.usuario import Perfil, Usuario
-from app.models.vinculo import Vinculo
 from app.schemas.plano_alimentar import PlanoAlimentarIn, PlanoAlimentarOut
 from app.services.auditoria import registrar_auditoria
+from app.services.vinculos import nutricionista_vinculado
 
 
 class PacienteNaoEncontrado(Exception):
@@ -38,12 +38,7 @@ def _exigir_acesso(db: Session, usuario: Usuario, paciente_id: int) -> None:
         if usuario.id != paciente_id:
             raise AcessoNegado
         return
-    vinculado = db.execute(
-        select(Vinculo.id).where(
-            Vinculo.nutricionista_id == usuario.id, Vinculo.paciente_id == paciente_id
-        )
-    ).first()
-    if vinculado is None:
+    if not nutricionista_vinculado(db, usuario.id, paciente_id):
         raise AcessoNegado
 
 

@@ -53,7 +53,7 @@ def _cenario(db: Session) -> None:
     factories.criar_paciente(db, PACIENTE_2)
     factories.criar_nutricionista(db, NUTRI_VINCULADO)
     factories.criar_nutricionista(db, NUTRI_SEM_VINCULO)
-    db.add(Vinculo(nutricionista_id=NUTRI_VINCULADO, paciente_id=PACIENTE_1))
+    db.add(Vinculo(nutricionista_id=NUTRI_VINCULADO, paciente_id=PACIENTE_1, status="ativo"))
     db.add(
         AlimentoTaco(
             nome="Bolo de teste",
@@ -192,6 +192,24 @@ def test_perfil_vem_do_banco_e_nao_do_token(client: TestClient) -> None:
     resposta = client.get(f"{API}/refeicoes", params={"paciente_id": PACIENTE_1}, headers=headers)
 
     assert resposta.status_code == 403
+
+
+@pytest.mark.parametrize("status_vinculo", ["pendente", "recusado", "encerrado"])
+def test_vinculo_que_nao_esta_ativo_nao_da_acesso(
+    client: TestClient, db: Session, status_vinculo: str
+) -> None:
+    """Codigo resgatado e ainda nao aceito, recusado ou encerrado: sem acesso (RNF06)."""
+    vinculo = db.query(Vinculo).filter_by(nutricionista_id=NUTRI_VINCULADO).one()
+    vinculo.status = status_vinculo
+    db.commit()
+
+    rotas = [
+        ("/refeicoes", {"params": {"paciente_id": PACIENTE_1}}),
+        (f"/pacientes/{PACIENTE_1}/planos/ativo", {}),
+        (f"/pacientes/{PACIENTE_1}/planos/versoes", {}),
+    ]
+    for rota, kwargs in rotas:
+        assert _status(client, "GET", rota, NUTRI_VINCULADO, **kwargs) == 403, rota
 
 
 # ---------------------------------------------------------------- triagem e lembretes

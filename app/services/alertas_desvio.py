@@ -26,7 +26,7 @@ from app.models.paciente import Paciente
 from app.models.plano_alimentar import PlanoAlimentar
 from app.models.refeicao import ItemRefeicao, Refeicao
 from app.models.usuario import Usuario
-from app.models.vinculo import Vinculo
+from app.models.vinculo import StatusVinculo, Vinculo
 from app.schemas.alerta_desvio import AlertaDesvioOut, RegraAlertaDesvioIn, RegraAlertaDesvioOut
 from app.services.gamificacao import FUSO_HORARIO
 
@@ -198,7 +198,7 @@ def processar_alertas_desvio_diario(
 
     Retorna o total de novos alertas gerados na execucao.
     """
-    consulta_vinculos = select(Vinculo)
+    consulta_vinculos = select(Vinculo).where(Vinculo.status == StatusVinculo.ATIVO.value)
     if nutricionista_id is not None:
         consulta_vinculos = consulta_vinculos.where(Vinculo.nutricionista_id == nutricionista_id)
     vinculos = list(db.execute(consulta_vinculos).scalars())

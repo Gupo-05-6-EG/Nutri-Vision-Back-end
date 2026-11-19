@@ -68,16 +68,17 @@ def _gerar_codigo() -> str:
 
 
 def nutricionista_vinculado(db: Session, nutricionista_id: int, paciente_id: int) -> bool:
-    """True se o nutricionista tem vinculo com o paciente (Task 1.6, RNF06).
+    """True se o nutricionista tem vinculo **ativo** com o paciente (Task 1.6, RNF06).
 
-    Nao ha status no vinculo: quem resgatou o codigo tem vinculo ativo, e nao ha
-    fluxo de desvinculo ainda.
+    Vinculo pendente (codigo resgatado, paciente ainda nao aceitou), recusado ou
+    encerrado nao da acesso aos dados do paciente.
     """
     return (
         db.execute(
             select(Vinculo.id).where(
                 Vinculo.nutricionista_id == nutricionista_id,
                 Vinculo.paciente_id == paciente_id,
+                Vinculo.status == StatusVinculo.ATIVO.value,
             )
         ).first()
         is not None

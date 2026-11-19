@@ -87,7 +87,7 @@ def test_job_diario_detecta_desvio_acima_da_meta_do_plano_e_notifica(
     criar_nutricionista(db, 100, nome="Dra. Helena")
     paciente = criar_paciente(db, 1)
     paciente.meta_kcal = Decimal("1800.00")
-    db.add(Vinculo(nutricionista_id=100, paciente_id=1))
+    db.add(Vinculo(nutricionista_id=100, paciente_id=1, status="ativo"))
 
     # Plano alimentar ativo com meta de 2000 kcal (tem prioridade sobre a meta basal)
     db.add(
@@ -193,8 +193,8 @@ def test_regra_customizada_abaixo_e_ambos_e_bloqueios(client: TestClient, db: Se
     p2.meta_kcal = Decimal("2000.00")
     db.add_all(
         [
-            Vinculo(nutricionista_id=100, paciente_id=1),
-            Vinculo(nutricionista_id=100, paciente_id=2),
+            Vinculo(nutricionista_id=100, paciente_id=1, status="ativo"),
+            Vinculo(nutricionista_id=100, paciente_id=2, status="ativo"),
         ]
     )
     db.commit()
@@ -251,7 +251,7 @@ def test_nao_gera_alerta_quando_dentro_da_faixa_ou_regra_inativa(
     criar_nutricionista(db, 100)
     paciente = criar_paciente(db, 1)
     paciente.meta_kcal = Decimal("2000.00")
-    db.add(Vinculo(nutricionista_id=100, paciente_id=1))
+    db.add(Vinculo(nutricionista_id=100, paciente_id=1, status="ativo"))
     db.commit()
 
     hoje = date(2026, 11, 14)
