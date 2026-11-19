@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.consentimento import Consentimento
+from app.models.desafio import Desafio, ParticipanteDesafio, StatusParticipante
 from app.models.paciente import Paciente
 from app.models.refeicao import Refeicao
 from app.models.usuario import Perfil, Usuario
@@ -161,9 +162,7 @@ def obter_ranking_publico(
     candidatos = []
     for pid in participantes_ids:
         paciente = pacientes.get(pid)
-        nome = (paciente.nome if paciente and paciente.nome else None) or (
-            paciente.username if paciente else None
-        )
+        nome = _nome_publico(paciente)
         avatar = paciente.avatar if paciente else None
         pontos = totais_xp.get(pid, 0)
         streak = paciente.streak if paciente else 0
@@ -191,57 +190,58 @@ def obter_ranking_publico(
     )
 
 
-def obter_desafio_publico(
-    db: Session,
-    desafio_id: int,
-    titulo: str = "Desafio Semanal de Adesao ao Plano",
-    participante_ids: list[int] | None = None,
-) -> DesafioPublicoOut:
-    """Gera o placar de desafio expondo APENAS nome, avatar, pontos e streak (RF05.2, RF29).
+class DesafioNaoEncontrado(Exception):
+    """Desafio inexistente ou o solicitante nao participa dele."""
 
-    Participantes competem sem ter seus dados clinicos (calorias consumidas, refeicoes
-    individuais ou peso) revelados aos demais concorrentes.
+
+def obter_desafio_publico(db: Session, desafio_id: int, solicitante_id: int) -> DesafioPublicoOut:
+    """Placar do desafio expondo APENAS nome, avatar, pontos e streak (RF05.2, RF29).
+
+    O titulo e os participantes (convites aceitos) vem do desafio cadastrado. So
+    quem participa (ou criou) enxerga o placar; para os demais o desafio "nao existe".
     """
-    ids = participante_ids or []
-    if not ids:
-        return DesafioPublicoOut(
-            desafio_id=desafio_id,
-            titulo=titulo,
-            total_participantes=0,
-            participantes=[],
+    desafio = db.get(Desafio, desafio_id)
+    if desafio is None:
+        raise DesafioNaoEncontrado
+    ids = list(
+        db.scalars(
+            select(ParticipanteDesafio.paciente_id)
+            .where(
+                ParticipanteDesafio.desafio_id == desafio_id,
+                ParticipanteDesafio.status == StatusParticipante.ACEITO.value,
+            )
+            .order_by(ParticipanteDesafio.paciente_id)
         )
+    )
+    if solicitante_id not in ids and solicitante_id != desafio.criador_id:
+        raise DesafioNaoEncontrado
 
-    pacientes_consulta = select(Paciente).where(Paciente.id.in_(ids))
-    pacientes = {p.id: p for p in db.scalars(pacientes_consulta).all()}
-
+    pacientes = {p.id: p for p in db.scalars(select(Paciente).where(Paciente.id.in_(ids)))}
     inicio, fim = gamificacao_servico.janela_semanal()
     totais_xp = gamificacao_servico.calcular_xp_semanal(db, ids, inicio, fim)
 
     participantes = []
     for pid in ids:
         paciente = pacientes.get(pid)
-        nome = (paciente.nome if paciente and paciente.nome else None) or (
-            paciente.username if paciente else None
-        )
-        avatar = paciente.avatar if paciente else None
-        pontos = totais_xp.get(pid, 0)
-        streak = paciente.streak if paciente else 0
-
         participantes.append(
             DesafioPublicoItem(
-                nome=nome,
-                avatar=avatar,
-                pontos=pontos,
-                streak=streak,
+                nome=_nome_publico(paciente),
+                avatar=paciente.avatar if paciente else None,
+                pontos=totais_xp.get(pid, 0),
+                streak=paciente.streak if paciente else 0,
             )
         )
-
-    # Ordenacao por pontuacao e streak
     participantes.sort(key=lambda p: (-p.pontos, -p.streak))
 
     return DesafioPublicoOut(
         desafio_id=desafio_id,
-        titulo=titulo,
+        titulo=desafio.nome,
         total_participantes=len(participantes),
         participantes=participantes,
     )
+
+
+def _nome_publico(paciente: Paciente | None) -> str | None:
+    if paciente is None:
+        return None
+    return paciente.nome or paciente.username

@@ -588,8 +588,8 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | GET | `/api/v1/amizades?status=` | Lista amigos e convites do paciente logado (RF05) |
 | DELETE | `/api/v1/amizades/{id}` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
 | GET | `/api/v1/gamificacao/leaderboard?limite=` | Leaderboard: Top 10 amigos do paciente logado por ganho de XP na janela semanal (RF05.3, RF29) |
-| GET | `/api/v1/privacidade/ranking-publico?paciente_id=&limite=` | Ranking público LGPD: expõe estritamente nome, avatar, pontos e streak (RF29, RNF07) |
-| GET | `/api/v1/privacidade/desafios/{id}/publico?participantes=` | Desafio público LGPD: expõe estritamente nome, avatar, pontos e streak (RF05.2, RF29) |
+| GET | `/api/v1/gamificacao/ranking-publico?limite=` | Ranking semanal dos amigos do paciente logado expondo só nome, avatar, pontos e streak (RF29, RNF07) |
+| GET | `/api/v1/gamificacao/desafios/{id}/publico` | Placar de um desafio (só para quem participa) expondo só nome, avatar, pontos e streak (RF05.2, RF29) |
 | GET | `/api/v1/gamificacao/historico-xp` | Histórico auditável de XP do paciente logado (RF16) |
 | GET | `/docs` | Swagger UI |
 
