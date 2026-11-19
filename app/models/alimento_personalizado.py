@@ -13,8 +13,9 @@ from datetime import datetime
 from decimal import Decimal
 
 from sqlalchemy import CheckConstraint, DateTime, Integer, Numeric, String, UniqueConstraint, func
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, validates
 
+from app.core.texto import sem_acento
 from app.db.base import Base
 
 
@@ -34,6 +35,8 @@ class AlimentoPersonalizado(Base):
     paciente_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
 
     nome: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    # Sem acento e em minusculas, preenchido a partir de `nome` (busca, B4).
+    nome_normalizado: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
 
     kcal_100g: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
     carbs_100g: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
@@ -43,3 +46,8 @@ class AlimentoPersonalizado(Base):
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
+
+    @validates("nome")
+    def _normalizar(self, _chave: str, valor: str) -> str:
+        self.nome_normalizado = sem_acento(valor)
+        return valor

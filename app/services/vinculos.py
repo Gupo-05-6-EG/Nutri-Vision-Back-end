@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.texto import sem_acento
 from app.models.usuario import Perfil, Usuario
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, StatusVinculo, Vinculo
 
@@ -282,9 +283,13 @@ def listar_pacientes(
         )
         .order_by(Usuario.nome, Usuario.id)
     )
-    if busca:
-        stmt = stmt.where(Usuario.nome.ilike(f"%{busca.strip()}%"))
-    return list(db.execute(stmt).all())
+    linhas = list(db.execute(stmt).all())
+    termo = sem_acento(busca)
+    if termo:
+        # Carteira de um nutricionista e pequena: filtrar aqui deixa a busca sem
+        # acento igual em qualquer banco.
+        linhas = [linha for linha in linhas if termo in sem_acento(linha[1].nome)]
+    return linhas
 
 
 def encerrar_vinculo(db: Session, nutricionista: Usuario, paciente_id: int) -> Vinculo:
