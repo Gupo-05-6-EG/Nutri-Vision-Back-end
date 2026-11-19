@@ -271,3 +271,12 @@ def test_placar_de_sequencia_da_meta(client: TestClient, db: Session) -> None:
     assert [p["paciente_id"] for p in participantes] == [1, 2]
     assert participantes[1]["pontuacao"] == 0
     assert {p["unidade"] for p in participantes} == {"dias consecutivos"}
+
+
+def test_unidade_do_placar_de_refeicoes_com_acento(client: TestClient, db: Session) -> None:
+    factories.criar_paciente(db, 1)
+    desafio_id = _criar_desafio(client, 1, tipo="refeicoes")
+
+    placar = client.get(f"{ROTA}/{desafio_id}/leaderboard", headers=_headers(1)).json()
+
+    assert {p["unidade"] for p in placar["participantes"]} == {"dias com todas as refeições"}
