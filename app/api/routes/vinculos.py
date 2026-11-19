@@ -1,6 +1,6 @@
 """Endpoints do fluxo de vinculacao (Task 1.4)."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
@@ -137,6 +137,11 @@ def listar_pacientes_vinculados(
     db: DbSession,
     usuario: NutricionistaAutenticado,
     busca: str | None = Query(default=None, max_length=120),
+    status_vinculo: Literal["ativo", "pendente", "todos"] = Query(
+        default="ativo",
+        alias="status",
+        description="ativo (padrao), pendente (resgatou o codigo e nao aceitou) ou todos",
+    ),
 ) -> list[PacienteVinculadoOut]:
     return [
         PacienteVinculadoOut(
@@ -146,7 +151,7 @@ def listar_pacientes_vinculados(
             status=vinculo.status,
             vinculado_em=vinculo.criado_em,
         )
-        for vinculo, paciente in servico.listar_pacientes(db, usuario, busca)
+        for vinculo, paciente in servico.listar_pacientes(db, usuario, busca, status_vinculo)
     ]
 
 

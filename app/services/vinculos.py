@@ -269,8 +269,17 @@ def responder_solicitacao(
     return vinculo
 
 
+STATUS_DA_LISTAGEM = {
+    "ativo": (StatusVinculo.ATIVO.value,),
+    "pendente": (StatusVinculo.PENDENTE.value,),
+    # "todos" = a carteira em andamento: ativos e os que resgataram o codigo e
+    # ainda nao aceitaram (recusados e encerrados ficam de fora).
+    "todos": (StatusVinculo.ATIVO.value, StatusVinculo.PENDENTE.value),
+}
+
+
 def listar_pacientes(
-    db: Session, nutricionista: Usuario, busca: str | None = None
+    db: Session, nutricionista: Usuario, busca: str | None = None, status: str = "ativo"
 ) -> list[tuple[Vinculo, Usuario]]:
     if nutricionista.perfil != Perfil.NUTRICIONISTA:
         raise PerfilIncompativel
@@ -279,7 +288,7 @@ def listar_pacientes(
         .join(Usuario, Usuario.id == Vinculo.paciente_id)
         .where(
             Vinculo.nutricionista_id == nutricionista.id,
-            Vinculo.status == StatusVinculo.ATIVO.value,
+            Vinculo.status.in_(STATUS_DA_LISTAGEM[status]),
         )
         .order_by(Usuario.nome, Usuario.id)
     )

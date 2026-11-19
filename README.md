@@ -568,7 +568,8 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | POST | `/api/v1/link` | Paciente resgata um codigo e cria uma solicitacao pendente |
 | POST | `/api/v1/link/{nutricionista_id}/aceitar` | Paciente aceita a solicitacao de vinculo |
 | POST | `/api/v1/link/{nutricionista_id}/recusar` | Paciente recusa a solicitacao de vinculo |
-| GET | `/api/v1/patients?busca=` | Nutricionista lista pacientes ativos com busca opcional por nome |
+| GET | `/api/v1/patients?busca=&status=` | Pacientes do nutricionista; `status` = `ativo` (padrão), `pendente` (resgatou o código e não aceitou) ou `todos` |
+| GET | `/api/v1/nutricionista/visao-geral?status=&busca=&pagina=&por_pagina=` | Visão geral da carteira: indicadores (ativos, pendentes, alertas críticos, adesão média, ofensiva média) e monitoramento por paciente (meta, consumo de hoje, adesão semanal, ofensiva, último registro, situação) (🔒 nutricionista) |
 | DELETE | `/api/v1/patients/{paciente_id}` | Nutricionista encerra o vinculo ativo |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
 | POST | `/api/v1/refeicoes/batch` | Sincroniza em lote as refeições registradas offline no app, sem duplicar reenvios (RNF07) |
@@ -898,6 +899,18 @@ volta, envia todas de uma vez para `POST /api/v1/refeicoes/batch`:
 No banco são `numeric(8,2)` e no código `Decimal` — as somas são exatas, sem erro
 de ponto flutuante. **No JSON saem como número** (`193.5`, não `"193.50"`), para
 o app e o painel não precisarem fazer parse de texto em campo numérico.
+
+### Visão geral da carteira
+
+`GET /nutricionista/visao-geral` (painel do nutricionista):
+
+- **adesão semanal**: dos últimos 7 dias locais completos, a porcentagem em que o
+  paciente ficou dentro da meta, com a mesma regra da ofensiva (pelo menos 2
+  refeições e consumo a até 30% da meta);
+- **em risco**: vínculo ativo com alerta de desvio não lido ou sem registro de
+  refeição há 48 h (`motivo_risco` diz qual); entram em `alertas_criticos`;
+- **pendente**: resgatou o código e ainda não aceitou o vínculo. Não traz meta
+  nem consumo, porque o nutricionista ainda não tem acesso aos dados de saúde.
 
 ### Fusos horários
 
