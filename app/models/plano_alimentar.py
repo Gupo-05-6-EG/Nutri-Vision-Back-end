@@ -6,6 +6,10 @@ ceia, ...), cada um com metas de kcal e proteinas e os alimentos indicados.
 Cada paciente tem no maximo um plano ativo: prescrever (ou editar) um plano cria
 uma versao nova e desativa a anterior (Task 5.3, RF08). As versoes antigas ficam
 no banco, intactas, e a trilha de quem mudou o que fica em `auditorias`.
+
+O nutricionista pode guardar um **rascunho** antes de prescrever: e uma linha com
+`rascunho=True` e `versao=0` (o UNIQUE por paciente/versao garante um rascunho
+so). O rascunho nao e ativo, nao aparece para o paciente nem no historico.
 """
 
 from datetime import datetime, time
@@ -22,12 +26,18 @@ from sqlalchemy import (
     String,
     Time,
     UniqueConstraint,
+    false,
     func,
     true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+
+def _soma_opcional(valores) -> Decimal | None:
+    presentes = [v for v in valores if v is not None]
+    return sum(presentes, Decimal("0")) if presentes else None
 
 
 class PlanoAlimentar(Base):
@@ -55,6 +65,9 @@ class PlanoAlimentar(Base):
     ativo: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()
     )
+    rascunho: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     criado_em: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )
@@ -72,6 +85,8 @@ class PlanoAlimentar(Base):
         return {
             "meta_kcal": sum((r.meta_kcal for r in self.refeicoes), Decimal("0")),
             "meta_proteinas_g": sum((r.meta_proteinas_g for r in self.refeicoes), Decimal("0")),
+            "meta_carboidratos_g": _soma_opcional(r.meta_carboidratos_g for r in self.refeicoes),
+            "meta_gorduras_g": _soma_opcional(r.meta_gorduras_g for r in self.refeicoes),
         }
 
 
@@ -96,6 +111,9 @@ class RefeicaoPlano(Base):
     horario: Mapped[time | None] = mapped_column(Time, nullable=True)
     meta_kcal: Mapped[Decimal] = mapped_column(Numeric(7, 2), nullable=False)
     meta_proteinas_g: Mapped[Decimal] = mapped_column(Numeric(6, 2), nullable=False)
+    # Opcionais: planos antigos so tinham kcal e proteina.
+    meta_carboidratos_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
+    meta_gorduras_g: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     observacao: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     plano: Mapped[PlanoAlimentar] = relationship(back_populates="refeicoes")

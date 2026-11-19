@@ -134,7 +134,8 @@ class TestHistorico:
         nova, antiga = _historico(client)
 
         assert antiga["refeicoes"][0]["meta_kcal"] == 500.0
-        assert antiga["totais"] == {"meta_kcal": 500.0, "meta_proteinas_g": 40.0}
+        assert antiga["totais"]["meta_kcal"] == 500.0
+        assert antiga["totais"]["meta_proteinas_g"] == 40.0
         assert nova["refeicoes"][0]["meta_kcal"] == 700.0
         assert nova["refeicoes"][0]["alimentos"][0]["nome_alimento"] == "Arroz"
         assert antiga["criado_em"].endswith(("Z", "+00:00"))

@@ -89,3 +89,65 @@ def historico_de_versoes(
         versao.autor = AutorPlanoOut.model_validate(autor) if autor is not None else None
         historico.append(versao)
     return historico
+
+
+def _rascunho(acao, *args) -> PlanoAlimentarOut | None:
+    try:
+        resultado = acao(*args)
+    except (servico.PacienteNaoEncontrado, servico.AcessoNegado) as erro:
+        raise _erro_de_acesso(erro) from None
+    except servico.RascunhoNaoEncontrado:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nenhum rascunho salvo") from None
+    except servico.AlimentoTacoNaoEncontrado:
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_ENTITY, "alimento_taco_id nao existe na TACO"
+        ) from None
+    return PlanoAlimentarOut.model_validate(resultado) if resultado is not None else None
+
+
+@router.put(
+    "/{paciente_id}/planos/rascunho",
+    response_model=PlanoAlimentarOut,
+    summary="Salva o rascunho do plano (nao vale para o paciente ate ser publicado)",
+)
+def salvar_rascunho(
+    paciente_id: PacienteId,
+    dados: PlanoAlimentarIn,
+    db: DbSession,
+    nutricionista: NutricionistaAutenticado,
+) -> PlanoAlimentarOut:
+    return _rascunho(servico.salvar_rascunho, db, nutricionista, paciente_id, dados)
+
+
+@router.get(
+    "/{paciente_id}/planos/rascunho",
+    response_model=PlanoAlimentarOut,
+    summary="Rascunho salvo do plano do paciente",
+)
+def obter_rascunho(
+    paciente_id: PacienteId, db: DbSession, nutricionista: NutricionistaAutenticado
+) -> PlanoAlimentarOut:
+    return _rascunho(servico.obter_rascunho, db, nutricionista, paciente_id)
+
+
+@router.post(
+    "/{paciente_id}/planos/rascunho/publicar",
+    response_model=PlanoAlimentarOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Prescreve o rascunho como uma versao nova do plano",
+)
+def publicar_rascunho(
+    paciente_id: PacienteId, db: DbSession, nutricionista: NutricionistaAutenticado
+) -> PlanoAlimentarOut:
+    return _rascunho(servico.publicar_rascunho, db, nutricionista, paciente_id)
+
+
+@router.delete(
+    "/{paciente_id}/planos/rascunho",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Descarta o rascunho do plano",
+)
+def descartar_rascunho(
+    paciente_id: PacienteId, db: DbSession, nutricionista: NutricionistaAutenticado
+) -> None:
+    _rascunho(servico.descartar_rascunho, db, nutricionista, paciente_id)

@@ -586,6 +586,10 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve ou edita o plano: salva uma versão nova e a torna a ativa (🔒 nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (🔒 nutricionista vinculado ou o próprio paciente) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/versoes` | Histórico de versões do plano, da mais nova para a mais antiga (RF08, 🔒 nutricionista vinculado) |
+| PUT | `/api/v1/pacientes/{paciente_id}/planos/rascunho` | Salva o rascunho do plano (um por paciente; não vale para o paciente até ser publicado) (🔒 nutricionista vinculado) |
+| GET | `/api/v1/pacientes/{paciente_id}/planos/rascunho` | Rascunho salvo do plano (🔒 nutricionista vinculado) |
+| POST | `/api/v1/pacientes/{paciente_id}/planos/rascunho/publicar` | Prescreve o rascunho como uma versão nova e o apaga (🔒 nutricionista vinculado) |
+| DELETE | `/api/v1/pacientes/{paciente_id}/planos/rascunho` | Descarta o rascunho (🔒 nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Lista os horários de lembrete de refeição (RF26) |
 | PUT | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Salva os horários de lembrete por refeição (RF26) |
 | PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |

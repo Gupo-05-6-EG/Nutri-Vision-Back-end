@@ -83,7 +83,12 @@ class TestPrescricao:
         cafe = corpo["refeicoes"][0]
         assert cafe["horario"] == "07:30:00"
         assert [a["nome_alimento"] for a in cafe["alimentos"]] == ["Pao integral", "Ovo cozido"]
-        assert corpo["totais"] == {"meta_kcal": 550.5, "meta_proteinas_g": 30.0}
+        assert corpo["totais"] == {
+            "meta_kcal": 550.5,
+            "meta_proteinas_g": 30.0,
+            "meta_carboidratos_g": None,
+            "meta_gorduras_g": None,
+        }
         assert corpo["criado_em"].endswith(("Z", "+00:00"))
 
     def test_novo_plano_desativa_o_anterior(self, client: TestClient) -> None:
