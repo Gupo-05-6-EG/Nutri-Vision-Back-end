@@ -5,14 +5,6 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 
-class RegistroXPIn(BaseModel):
-    """Payload para registrar ganho de experiencia (XP)."""
-
-    paciente_id: int = Field(gt=0, description="Id do paciente beneficiado")
-    quantidade: int = Field(gt=0, description="Pontos de XP a conceder")
-    motivo: str = Field(min_length=1, max_length=100, description="Origem da pontuacao")
-
-
 class HistoricoXPOut(BaseModel):
     """Registro individual de evento de ganho de experiencia."""
 
@@ -87,5 +79,4 @@ __all__ = [
     "LeaderboardOut",
     "RankingPublicoItem",
     "RankingPublicoOut",
-    "RegistroXPIn",
 ]

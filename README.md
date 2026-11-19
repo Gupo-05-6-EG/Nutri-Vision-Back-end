@@ -150,6 +150,7 @@ no caminho, na query ou no corpo, e é conferido contra o token:
 | Resgatar código (`/link`) | só paciente |
 | Busca na TACO (`/alimentos-taco`, `/alimentos` sem `paciente_id`) e `/calculo-nutricional` | qualquer usuário logado |
 | Análise de fotos pela IA (`/analises`) | só pacientes |
+| Gamificação e amizades (`/gamificacao/*`, `/amizades/*`) | só paciente, sempre em nome de quem está logado (o id vem do token) |
 
 Sem acesso a resposta é `403` — inclusive quando o paciente não existe, para a API não
 revelar quais ids existem. Ter vínculo com um paciente não dá acesso a outro.
@@ -584,13 +585,12 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | POST | `/api/v1/calculo-nutricional` | Calcula kcal/macros por porção, por id da TACO ou classe da IA (RF03, RF20, RF21) |
 | POST | `/api/v1/amizades` | Envia uma solicitação de amizade para outro paciente (RF05) |
 | PUT | `/api/v1/amizades/{id}/responder` | Aceita ou recusa convite de amizade recebido (RF05) |
-| GET | `/api/v1/amizades?paciente_id=&status=` | Lista amigos e convites de um paciente (RF05) |
-| DELETE | `/api/v1/amizades/{id}?paciente_id=` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
-| GET | `/api/v1/gamificacao/leaderboard?paciente_id=&limite=` | Leaderboard: Top 10 amigos por ganho de XP na janela semanal (RF05.3, RF29) |
+| GET | `/api/v1/amizades?status=` | Lista amigos e convites do paciente logado (RF05) |
+| DELETE | `/api/v1/amizades/{id}` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
+| GET | `/api/v1/gamificacao/leaderboard?limite=` | Leaderboard: Top 10 amigos do paciente logado por ganho de XP na janela semanal (RF05.3, RF29) |
 | GET | `/api/v1/privacidade/ranking-publico?paciente_id=&limite=` | Ranking público LGPD: expõe estritamente nome, avatar, pontos e streak (RF29, RNF07) |
 | GET | `/api/v1/privacidade/desafios/{id}/publico?participantes=` | Desafio público LGPD: expõe estritamente nome, avatar, pontos e streak (RF05.2, RF29) |
-| POST | `/api/v1/gamificacao/xp` | Concede pontos de XP ao paciente e registra histórico (RF05, RF16) |
-| GET | `/api/v1/gamificacao/historico-xp?paciente_id=` | Histórico auditável de XP do paciente (RF16) |
+| GET | `/api/v1/gamificacao/historico-xp` | Histórico auditável de XP do paciente logado (RF16) |
 | GET | `/docs` | Swagger UI |
 
 > Os endpoints de vinculação exigem o token do login (`Authorization: Bearer ...`):

@@ -320,7 +320,7 @@ class TestConformidadePrivacidadeEndpoints:
         amigo_terceiro: Paciente,
     ) -> None:
         """Endpoint de amizades expoe dados sociais e exclui metricas clinicas."""
-        resp = client.get(f"/api/v1/amizades?paciente_id={amigo_terceiro.id}")
+        resp = client.get("/api/v1/amizades", headers=factories.headers_de(amigo_terceiro.id))
         assert resp.status_code == 200
         amigos = resp.json()
         assert len(amigos) == 1

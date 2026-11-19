@@ -39,7 +39,8 @@ class TestSolicitacaoAmizade:
     ) -> None:
         resposta = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         assert resposta.status_code == 201
         dados = resposta.json()
@@ -50,7 +51,8 @@ class TestSolicitacaoAmizade:
     def test_impede_auto_amizade(self, client: TestClient, paciente_a: Paciente) -> None:
         resposta = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_a.id},
+            json={"amigo_id": paciente_a.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         assert resposta.status_code == 422
         assert "mesmo" in resposta.json()["detail"].lower()
@@ -60,7 +62,8 @@ class TestSolicitacaoAmizade:
     ) -> None:
         resposta = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": 9999},
+            json={"amigo_id": 9999},
+            headers=factories.headers_de(paciente_a.id),
         )
         assert resposta.status_code == 404
 
@@ -69,11 +72,13 @@ class TestSolicitacaoAmizade:
     ) -> None:
         client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         resposta = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         assert resposta.status_code == 409
         assert "pendente" in resposta.json()["detail"].lower()
@@ -84,12 +89,14 @@ class TestSolicitacaoAmizade:
         # A envia para B
         client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         # B também envia para A (convite cruzado)
         resposta = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_b.id, "amigo_id": paciente_a.id},
+            json={"amigo_id": paciente_a.id},
+            headers=factories.headers_de(paciente_b.id),
         )
         assert resposta.status_code == 201
         assert resposta.json()["status"] == "aceito"
@@ -101,13 +108,15 @@ class TestRespostaSolicitacao:
     ) -> None:
         post_resp = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = post_resp.json()["id"]
 
         resp = client.put(
             f"/api/v1/amizades/{amizade_id}/responder",
-            json={"paciente_id": paciente_b.id, "aceitar": True},
+            json={"aceitar": True},
+            headers=factories.headers_de(paciente_b.id),
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "aceito"
@@ -117,13 +126,15 @@ class TestRespostaSolicitacao:
     ) -> None:
         post_resp = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = post_resp.json()["id"]
 
         resp = client.put(
             f"/api/v1/amizades/{amizade_id}/responder",
-            json={"paciente_id": paciente_b.id, "aceitar": False},
+            json={"aceitar": False},
+            headers=factories.headers_de(paciente_b.id),
         )
         assert resp.status_code == 200
         assert resp.json()["status"] == "recusado"
@@ -137,13 +148,15 @@ class TestRespostaSolicitacao:
     ) -> None:
         post_resp = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = post_resp.json()["id"]
 
         resp = client.put(
             f"/api/v1/amizades/{amizade_id}/responder",
-            json={"paciente_id": paciente_c.id, "aceitar": True},
+            json={"aceitar": True},
+            headers=factories.headers_de(paciente_c.id),
         )
         assert resp.status_code == 403
 
@@ -159,27 +172,32 @@ class TestListagemAmizades:
         # A envia para B e B aceita
         r1 = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         client.put(
             f"/api/v1/amizades/{r1.json()['id']}/responder",
-            json={"paciente_id": paciente_b.id, "aceitar": True},
+            json={"aceitar": True},
+            headers=factories.headers_de(paciente_b.id),
         )
 
         # C envia para A (fica pendente)
         client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_c.id, "amigo_id": paciente_a.id},
+            json={"amigo_id": paciente_a.id},
+            headers=factories.headers_de(paciente_c.id),
         )
 
         # Lista todas as amizades de A
-        resp = client.get(f"/api/v1/amizades?paciente_id={paciente_a.id}")
+        resp = client.get("/api/v1/amizades", headers=factories.headers_de(paciente_a.id))
         assert resp.status_code == 200
         itens = resp.json()
         assert len(itens) == 2
 
         # Filtra apenas por aceitas
-        resp_aceitos = client.get(f"/api/v1/amizades?paciente_id={paciente_a.id}&status=aceito")
+        resp_aceitos = client.get(
+            "/api/v1/amizades?status=aceito", headers=factories.headers_de(paciente_a.id)
+        )
         assert resp_aceitos.status_code == 200
         itens_aceitos = resp_aceitos.json()
         assert len(itens_aceitos) == 1
@@ -193,15 +211,18 @@ class TestRemoverAmizade:
     ) -> None:
         r = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = r.json()["id"]
 
-        del_resp = client.delete(f"/api/v1/amizades/{amizade_id}?paciente_id={paciente_a.id}")
+        del_resp = client.delete(
+            f"/api/v1/amizades/{amizade_id}", headers=factories.headers_de(paciente_a.id)
+        )
         assert del_resp.status_code == 204
 
         # Confirmar exclusao
-        lista = client.get(f"/api/v1/amizades?paciente_id={paciente_a.id}").json()
+        lista = client.get("/api/v1/amizades", headers=factories.headers_de(paciente_a.id)).json()
         assert len(lista) == 0
 
     def test_usuario_estranho_nao_pode_remover(
@@ -213,9 +234,12 @@ class TestRemoverAmizade:
     ) -> None:
         r = client.post(
             "/api/v1/amizades",
-            json={"paciente_id": paciente_a.id, "amigo_id": paciente_b.id},
+            json={"amigo_id": paciente_b.id},
+            headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = r.json()["id"]
 
-        del_resp = client.delete(f"/api/v1/amizades/{amizade_id}?paciente_id={paciente_c.id}")
+        del_resp = client.delete(
+            f"/api/v1/amizades/{amizade_id}", headers=factories.headers_de(paciente_c.id)
+        )
         assert del_resp.status_code == 403

@@ -8,16 +8,14 @@ from app.models.amizade import StatusAmizade
 
 
 class SolicitacaoAmizadeCreate(BaseModel):
-    """Payload para enviar uma nova solicitacao de amizade."""
+    """Payload para enviar uma nova solicitacao de amizade (o solicitante vem do token)."""
 
-    paciente_id: int = Field(gt=0, description="Id do paciente solicitante")
     amigo_id: int = Field(gt=0, description="Id do paciente convidado")
 
 
 class RespostaSolicitacao(BaseModel):
-    """Payload para aceitar ou recusar uma solicitacao de amizade."""
+    """Payload para aceitar ou recusar uma solicitacao (quem responde vem do token)."""
 
-    paciente_id: int = Field(gt=0, description="Id do paciente que responde (deve ser o convidado)")
     aceitar: bool = Field(description="True para aceitar o convite, False para recusar")
 
 

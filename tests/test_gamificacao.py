@@ -14,6 +14,8 @@ from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.services.gamificacao import (
     FUSO_HORARIO,
     XP_POR_DIA,
+    PacienteNaoEncontrado,
+    conceder_xp,
     janela_semanal,
     processar_gamificacao_diaria,
 )
@@ -59,33 +61,34 @@ class TestJanelaSemanal:
 
 
 class TestConcessaoXP:
-    def test_concede_xp_e_acumula_saldo(
-        self, client: TestClient, db: Session, paciente_principal: Paciente
-    ) -> None:
-        resposta = client.post(
-            "/api/v1/gamificacao/xp",
-            json={
-                "paciente_id": paciente_principal.id,
-                "quantidade": 50,
-                "motivo": "meta_diaria",
-            },
-        )
-        assert resposta.status_code == 201
-        dados = resposta.json()
-        assert dados["quantidade"] == 50
-        assert dados["motivo"] == "meta_diaria"
+    def test_concede_xp_e_acumula_saldo(self, db: Session, paciente_principal: Paciente) -> None:
+        registro = conceder_xp(db, paciente_principal.id, 50, "meta_diaria")
 
+        assert registro.quantidade == 50
+        assert registro.motivo == "meta_diaria"
         db.expire_all()
         paciente_atualizado = db.get(Paciente, paciente_principal.id)
         assert paciente_atualizado is not None
         assert paciente_atualizado.xp == 50
 
-    def test_paciente_inexistente_retorna_404(self, client: TestClient) -> None:
-        resposta = client.post(
-            "/api/v1/gamificacao/xp",
-            json={"paciente_id": 9999, "quantidade": 50, "motivo": "teste"},
+    def test_paciente_inexistente(self, db: Session) -> None:
+        with pytest.raises(PacienteNaoEncontrado):
+            conceder_xp(db, 9999, 50, "teste")
+
+    def test_historico_e_do_paciente_autenticado(
+        self, client: TestClient, db: Session, paciente_principal: Paciente
+    ) -> None:
+        outro = _criar_paciente_social(db, 20, "outro")
+        conceder_xp(db, paciente_principal.id, 30, "refeicao")
+        conceder_xp(db, outro.id, 99, "refeicao")
+
+        resposta = client.get(
+            "/api/v1/gamificacao/historico-xp?paciente_id=20",
+            headers=factories.headers_de(paciente_principal.id),
         )
-        assert resposta.status_code == 404
+
+        assert resposta.status_code == 200
+        assert [r["quantidade"] for r in resposta.json()] == [30]
 
 
 class TestLeaderboardSemanal:
@@ -93,7 +96,7 @@ class TestLeaderboardSemanal:
         self, client: TestClient, paciente_principal: Paciente
     ) -> None:
         resposta = client.get(
-            f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}"
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
         )
         assert resposta.status_code == 200
         dados = resposta.json()
@@ -183,7 +186,9 @@ class TestLeaderboardSemanal:
         )
         db.commit()
 
-        resp = client.get(f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}")
+        resp = client.get(
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
+        )
         assert resp.status_code == 200
         dados = resp.json()
         assert dados["total_participantes"] == 4
@@ -247,7 +252,9 @@ class TestLeaderboardSemanal:
         )
         db.commit()
 
-        resp = client.get(f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}")
+        resp = client.get(
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
+        )
         assert resp.status_code == 200
         dados = resp.json()
         # Apenas paciente_principal deve estar no ranking
@@ -278,7 +285,9 @@ class TestLeaderboardSemanal:
             )
         db.commit()
 
-        resp = client.get(f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}")
+        resp = client.get(
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
+        )
         assert resp.status_code == 200
         dados = resp.json()
         assert dados["total_participantes"] == 16  # 15 amigos + 1 principal
@@ -288,7 +297,9 @@ class TestLeaderboardSemanal:
         self, client: TestClient, db: Session, paciente_principal: Paciente
     ) -> None:
         """RF-29: O placar deve restringir exposicao a dados nao sensiveis (pontos, streak)."""
-        resp = client.get(f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}")
+        resp = client.get(
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
+        )
         assert resp.status_code == 200
         item = resp.json()["ranking"][0]
 

@@ -117,6 +117,14 @@ def _requisicoes_protegidas(refeicao_id: int) -> list[tuple[str, str, dict[str, 
         ("GET", "/alimentos", {"params": {"nome": "bolo"}}),
         ("GET", "/alimentos-taco", {"params": {"nome": "bolo"}}),
         ("POST", "/calculo-nutricional", {"json": {"itens": []}}),
+        # Gamificacao e social (RF05, RF16): antes respondiam sem login.
+        ("GET", "/gamificacao", {}),
+        ("GET", "/gamificacao/leaderboard", {}),
+        ("GET", "/gamificacao/historico-xp", {}),
+        ("POST", "/amizades", {"json": {"amigo_id": PACIENTE_2}}),
+        ("GET", "/amizades", {}),
+        ("PUT", "/amizades/1/responder", {"json": {"aceitar": True}}),
+        ("DELETE", "/amizades/1", {}),
     ]
 
 
@@ -142,6 +150,39 @@ def test_endpoints_publicos_seguem_abertos(client: TestClient) -> None:
     assert client.get(f"{API}/health").status_code == 200
     login = client.post(f"{API}/auth/login", json={"email": "x@x.com", "senha": "qualquer"})
     assert login.status_code == 401  # credencial errada, nao falta de token
+
+
+def test_xp_nao_pode_mais_ser_concedido_pela_api(client: TestClient) -> None:
+    """A rota aberta POST /gamificacao/xp saiu: XP so por regra interna (RF16)."""
+    corpo = {"paciente_id": PACIENTE_1, "quantidade": 5000, "motivo": "x"}
+    for usuario in (None, PACIENTE_1, NUTRI_VINCULADO):
+        assert _status(client, "POST", "/gamificacao/xp", usuario, json=corpo) in (404, 405)
+
+
+@pytest.mark.parametrize(
+    ("metodo", "rota", "kwargs"),
+    [
+        ("GET", "/gamificacao/leaderboard", {}),
+        ("GET", "/gamificacao/historico-xp", {}),
+        ("GET", "/amizades", {}),
+        ("POST", "/amizades", {"json": {"amigo_id": PACIENTE_2}}),
+    ],
+)
+def test_social_e_so_para_paciente(
+    client: TestClient, metodo: str, rota: str, kwargs: dict[str, Any]
+) -> None:
+    assert _status(client, metodo, rota, NUTRI_VINCULADO, **kwargs) == 403
+
+
+def test_amizade_nao_e_criada_em_nome_de_outro(client: TestClient) -> None:
+    """O corpo nao escolhe mais o solicitante: vale o paciente do token."""
+    resposta = client.post(
+        f"{API}/amizades",
+        json={"paciente_id": PACIENTE_2, "amigo_id": PACIENTE_2},
+        headers=como(PACIENTE_1),
+    )
+    assert resposta.status_code == 201
+    assert resposta.json()["pac_id"] == PACIENTE_1
 
 
 def test_perfil_vem_do_banco_e_nao_do_token(client: TestClient) -> None:

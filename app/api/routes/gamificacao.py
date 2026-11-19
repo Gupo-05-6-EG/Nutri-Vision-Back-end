@@ -15,7 +15,6 @@ from app.schemas.gamificacao import (
     HistoricoXPOut,
     LeaderboardOut,
     RankingPublicoOut,
-    RegistroXPIn,
 )
 from app.services import gamificacao as servico
 
@@ -34,7 +33,7 @@ Deslocamento = Annotated[int, Query(ge=0, description="Deslocamento para paginac
 )
 def obter_leaderboard(
     db: DbSession,
-    paciente_id: PacienteId,
+    usuario: PacienteAtual,
     limite: Limite = 10,
     incluir_solicitante: Annotated[
         bool,
@@ -44,7 +43,7 @@ def obter_leaderboard(
     try:
         return servico.obter_leaderboard_semanal(
             db,
-            paciente_id=paciente_id,
+            paciente_id=usuario.id,
             limite=limite,
             incluir_solicitante=incluir_solicitante,
         )
@@ -113,40 +112,20 @@ def obter_desafio_publico(
     )
 
 
-@router.post(
-    "/xp",
-    response_model=HistoricoXPOut,
-    status_code=status.HTTP_201_CREATED,
-    summary="Concede pontos de experiencia (XP) ao paciente",
-)
-def conceder_xp(dados: RegistroXPIn, db: DbSession) -> HistoricoXPOut:
-    try:
-        registro = servico.conceder_xp(
-            db,
-            paciente_id=dados.paciente_id,
-            quantidade=dados.quantidade,
-            motivo=dados.motivo,
-        )
-    except servico.PacienteNaoEncontrado as e:
-        raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
-
-    return HistoricoXPOut.model_validate(registro)
-
-
 @router.get(
     "/historico-xp",
     response_model=list[HistoricoXPOut],
-    summary="Lista o historico de ganhos de XP de um paciente",
+    summary="Lista o historico de ganhos de XP do paciente autenticado",
 )
 def listar_historico_xp(
     db: DbSession,
-    paciente_id: PacienteId,
+    usuario: PacienteAtual,
     limite: Limite = 50,
     deslocamento: Deslocamento = 0,
 ) -> list[HistoricoXPOut]:
     try:
         registros = servico.listar_historico_xp(
-            db, paciente_id=paciente_id, limite=limite, deslocamento=deslocamento
+            db, paciente_id=usuario.id, limite=limite, deslocamento=deslocamento
         )
     except servico.PacienteNaoEncontrado as e:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(e)) from None
