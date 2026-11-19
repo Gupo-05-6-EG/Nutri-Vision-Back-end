@@ -84,7 +84,7 @@ convidar outros pacientes pelo ID. O convite precisa ser aceito para a pessoa
 entrar no placar. Tipos aceitos: `refeicoes` (dias em que as quatro categorias
 de refeição foram registradas), `variacao_calorica` (menor média de diferença absoluta entre o
 consumo diário e a meta calórica) e `sequencia_meta` (maior sequência de dias
-com pelo menos duas refeições e consumo até 30% da meta, seguindo o critério
+com pelo menos duas refeições e consumo a até 30% da meta, para mais ou para menos, seguindo o critério
 do processamento diário de gamificação). A variação calórica inclui dias sem
 registro como consumo zero. As datas são enviadas com fuso horário.
 
@@ -369,12 +369,23 @@ As colunas são opcionais porque o cadastro cria o paciente antes da triagem.
 
 `streak` e `xp` guardam, respectivamente, os dias consecutivos que cumpriram a
 regra de gamificação e os pontos acumulados. O fechamento diário considera as
-refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo de
-até 30% de `meta_kcal`, soma 1 ao streak e 50 XP. Quando a regra falha,
+refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo a
+até 30% de `meta_kcal` (para mais ou para menos), soma 1 ao streak e 50 XP. Quando a regra falha,
 consome um bloqueio se houver saldo e uma ofensiva ativa. Nesse caso, mantém
 o streak e o XP. Sem proteção, zera o streak.
 O fechamento não altera XP quando a regra não é cumprida. Pacientes sem meta
 calórica também não cumprem a regra.
+
+**XP só por regras internas** (não há rota para conceder XP): cada ganho grava
+um registro em `historico_xp`, que alimenta o ranking semanal.
+
+| Evento | XP |
+|---|---|
+| Boas-vindas, no cadastro do paciente | 50 |
+| Refeição registrada (uma por tipo de refeição por dia local) | 10 |
+| Refeição registrada por foto (`"origem": "foto"`, no lugar dos 10) | 20 |
+| Dia dentro da meta (fechamento diário) | 50 |
+| Incentivo do nutricionista vinculado (uma vez por dia) | 10 |
 
 O job pode ser agendado pelo cron do ambiente para 23:59 (horário de São Paulo):
 

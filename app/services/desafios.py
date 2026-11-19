@@ -17,8 +17,7 @@ from app.models.desafio import (
 from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.models.usuario import Perfil, Usuario
-
-PERCENTUAL_TOLERANCIA_META = Decimal("0.30")
+from app.services.gamificacao import cumpriu_meta_do_dia
 
 
 class DesafioNaoEncontrado(Exception):
@@ -253,10 +252,8 @@ def _pontuacoes(db: Session, desafio: Desafio, tipo: str) -> list[tuple[int, str
             for offset in range(dias):
                 dia = inicio.fromordinal(inicio.toordinal() + offset)
                 calorias_dia = totais.get(dia, Decimal(0))
-                if (
-                    meta is not None
-                    and len(refeicoes_por_dia[paciente_id][dia]) >= 2
-                    and calorias_dia <= meta * PERCENTUAL_TOLERANCIA_META
+                if cumpriu_meta_do_dia(
+                    meta, len(refeicoes_por_dia[paciente_id][dia]), calorias_dia
                 ):
                     streak += 1
                     melhor = max(melhor, streak)

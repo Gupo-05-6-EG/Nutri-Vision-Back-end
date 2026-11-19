@@ -256,7 +256,8 @@ def test_placar_de_variacao_calorica_ordena_menor_desvio_primeiro(
 def test_placar_de_sequencia_da_meta(client: TestClient, db: Session) -> None:
     primeiro = factories.criar_paciente(db, 1)
     segundo = factories.criar_paciente(db, 2)
-    primeiro.meta_kcal = segundo.meta_kcal = Decimal("2000")
+    # Duas refeicoes de 100 kcal: dentro de 30% de uma meta de 200 kcal
+    primeiro.meta_kcal = segundo.meta_kcal = Decimal("200")
     db.commit()
     desafio_id = _criar_desafio(client, 1, tipo="sequencia_meta", convidados=[2])
     client.post(f"{ROTA}/{desafio_id}/response", headers=_headers(2), json={"aceitar": True})

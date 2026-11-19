@@ -351,8 +351,8 @@ def _refeicao(db: Session, paciente_id: int, hora: int, kcal: str, dia: date = D
 
 def test_dia_valido_soma_streak_e_xp(db: Session) -> None:
     paciente = _paciente(db)
-    _refeicao(db, 1, 8, "200")
-    _refeicao(db, 1, 12, "300")  # 500 kcal <= 30% de 2000
+    _refeicao(db, 1, 8, "900")
+    _refeicao(db, 1, 12, "1000")  # 1900 kcal: dentro de 30% da meta de 2000
 
     assert processar_gamificacao_diaria(db, DIA) == 1
 
@@ -377,12 +377,36 @@ def test_acima_do_limite_da_meta_zera_streak(db: Session) -> None:
     paciente = _paciente(db)
     paciente.streak = 2
     db.commit()
-    _refeicao(db, 1, 8, "400")
-    _refeicao(db, 1, 12, "300")  # 700 kcal > 600
+    _refeicao(db, 1, 8, "1500")
+    _refeicao(db, 1, 12, "1300")  # 2800 kcal > 2600 (meta + 30%)
 
     processar_gamificacao_diaria(db, DIA)
 
     assert paciente.streak == 0
+
+
+def test_abaixo_do_limite_da_meta_zera_streak(db: Session) -> None:
+    """Comer muito menos que a meta tambem nao e dia dentro da meta."""
+    paciente = _paciente(db)
+    paciente.streak = 2
+    db.commit()
+    _refeicao(db, 1, 8, "200")
+    _refeicao(db, 1, 12, "300")  # 500 kcal < 1400 (meta - 30%)
+
+    processar_gamificacao_diaria(db, DIA)
+
+    assert paciente.streak == 0
+
+
+def test_dia_valido_grava_historico_de_xp(db: Session) -> None:
+    paciente = _paciente(db)
+    _refeicao(db, 1, 8, "1000")
+    _refeicao(db, 1, 12, "1000")
+
+    processar_gamificacao_diaria(db, DIA)
+
+    historico = db.query(HistoricoXP).filter_by(paciente_id=paciente.id).all()
+    assert [(h.quantidade, h.motivo) for h in historico] == [(XP_POR_DIA, f"meta_diaria:{DIA}")]
 
 
 def test_paciente_sem_meta_nao_cumpre(db: Session) -> None:
@@ -399,8 +423,8 @@ def test_paciente_sem_meta_nao_cumpre(db: Session) -> None:
 def test_considera_o_dia_no_fuso_de_sao_paulo(db: Session) -> None:
     paciente = _paciente(db)
     # 22h em Sao Paulo ja e o dia seguinte em UTC, mas conta para DIA.
-    _refeicao(db, 1, 21, "100")
-    _refeicao(db, 1, 22, "100")
+    _refeicao(db, 1, 21, "1000")
+    _refeicao(db, 1, 22, "1000")
 
     processar_gamificacao_diaria(db, DIA)
 
@@ -409,8 +433,8 @@ def test_considera_o_dia_no_fuso_de_sao_paulo(db: Session) -> None:
 
 def test_rodar_duas_vezes_no_mesmo_dia_nao_credita_de_novo(db: Session) -> None:
     paciente = _paciente(db)
-    _refeicao(db, 1, 8, "100")
-    _refeicao(db, 1, 12, "100")
+    _refeicao(db, 1, 8, "1000")
+    _refeicao(db, 1, 12, "1000")
 
     processar_gamificacao_diaria(db, DIA)
     assert processar_gamificacao_diaria(db, DIA) == 0
@@ -441,8 +465,8 @@ def test_dia_valido_nao_consume_bloqueio(db: Session) -> None:
     paciente = _paciente(db)
     paciente.streak, paciente.bloqueios_perda = 2, 1
     db.commit()
-    _refeicao(db, 1, 8, "100")
-    _refeicao(db, 1, 12, "100")
+    _refeicao(db, 1, 8, "1000")
+    _refeicao(db, 1, 12, "1000")
 
     processar_gamificacao_diaria(db, DIA)
 

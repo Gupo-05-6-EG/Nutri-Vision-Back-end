@@ -1,4 +1,15 @@
-"""Processamento diario de streak/XP e Leaderboard Semanal (RF05, RF16, RF29)."""
+"""Processamento diario de streak/XP e Leaderboard Semanal (RF05, RF16, RF29).
+
+XP so vem de regras internas (a rota aberta POST /gamificacao/xp saiu):
+
+- boas-vindas, no cadastro: 50
+- refeicao registrada (uma por tipo de refeicao por dia local): 10
+- refeicao registrada por foto (no lugar dos 10): 20
+- dia dentro da meta (fechamento diario): 50
+- incentivo do nutricionista vinculado (1 por dia): 10
+
+Todo ganho grava um HistoricoXP, que alimenta o ranking semanal.
+"""
 
 from datetime import UTC, date, datetime, time
 from decimal import Decimal
@@ -7,7 +18,7 @@ from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.core.tempo import FUSO as FUSO_HORARIO
-from app.core.tempo import hoje_local, janela_semanal
+from app.core.tempo import em_fuso_local, hoje_local, janela_semanal
 from app.models.historico_xp import HistoricoXP
 from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao
@@ -15,9 +26,63 @@ from app.schemas.gamificacao import LeaderboardItem, LeaderboardOut
 from app.services import amizades as amizades_servico
 from app.services.conquistas import registrar_conquistas
 
-PERCENTUAL_MAXIMO_DA_META = Decimal("0.30")
+# Dia "dentro da meta": pelo menos 2 refeicoes e consumo a ate 30% da meta, para
+# mais ou para menos. (Antes a regra era consumo <= 30% DA meta: quem comia o
+# planejado nunca pontuava.)
+TOLERANCIA_DA_META = Decimal("0.30")
+MINIMO_REFEICOES_NO_DIA = 2
 XP_POR_DIA = 50
+XP_BOAS_VINDAS = 50
+XP_REFEICAO = 10
+XP_REFEICAO_FOTO = 20
+XP_INCENTIVO = 10
 CUSTO_BLOQUEIO_XP = 100
+
+
+def cumpriu_meta_do_dia(meta_kcal: Decimal | None, refeicoes: int, calorias: Decimal) -> bool:
+    """Regra unica do dia dentro da meta (ofensiva e desafio `sequencia_meta`)."""
+    if meta_kcal is None or meta_kcal <= 0 or refeicoes < MINIMO_REFEICOES_NO_DIA:
+        return False
+    return abs(calorias - meta_kcal) <= meta_kcal * TOLERANCIA_DA_META
+
+
+def registrar_xp(db: Session, paciente: Paciente, quantidade: int, motivo: str) -> HistoricoXP:
+    """Soma XP e grava o historico, sem commit (entra na transacao de quem chamou)."""
+    paciente.xp = (paciente.xp or 0) + quantidade
+    registro = HistoricoXP(
+        paciente_id=paciente.id,
+        quantidade=quantidade,
+        motivo=motivo,
+        criado_em=datetime.now(UTC),
+    )
+    db.add(registro)
+    return registro
+
+
+def ja_recebeu(db: Session, paciente_id: int, *motivos: str) -> bool:
+    return (
+        db.scalar(
+            select(HistoricoXP.id)
+            .where(HistoricoXP.paciente_id == paciente_id, HistoricoXP.motivo.in_(motivos))
+            .limit(1)
+        )
+        is not None
+    )
+
+
+def xp_por_refeicao(db: Session, refeicao: Refeicao, por_foto: bool) -> int:
+    """Credita o XP de uma refeicao nova: um por tipo de refeicao por dia local."""
+    chave = f"{refeicao.tipo}:{em_fuso_local(refeicao.consumida_em).date().isoformat()}"
+    if ja_recebeu(db, refeicao.paciente_id, f"refeicao:{chave}", f"refeicao_foto:{chave}"):
+        return 0
+    paciente = db.get(Paciente, refeicao.paciente_id)
+    if paciente is None:
+        return 0
+    if por_foto:
+        registrar_xp(db, paciente, XP_REFEICAO_FOTO, f"refeicao_foto:{chave}")
+        return XP_REFEICAO_FOTO
+    registrar_xp(db, paciente, XP_REFEICAO, f"refeicao:{chave}")
+    return XP_REFEICAO
 
 
 def resgatar_bloqueio(db: Session, paciente_id: int) -> Paciente | None:
@@ -51,15 +116,7 @@ def _garantir_paciente(db: Session, paciente_id: int) -> Paciente:
 def conceder_xp(db: Session, paciente_id: int, quantidade: int, motivo: str) -> HistoricoXP:
     """Registra ganho de XP para um paciente e atualiza seu saldo total acumulado."""
     paciente = _garantir_paciente(db, paciente_id)
-
-    paciente.xp += quantidade
-    registro = HistoricoXP(
-        paciente_id=paciente_id,
-        quantidade=quantidade,
-        motivo=motivo,
-        criado_em=datetime.now(UTC),
-    )
-    db.add(registro)
+    registro = registrar_xp(db, paciente, quantidade, motivo)
     db.commit()
     db.refresh(registro)
     return registro
@@ -218,14 +275,9 @@ def processar_gamificacao_diaria(db: Session, dia: date) -> int:
     for paciente in pacientes:
         streak_anterior = paciente.streak
         quantidade, calorias = resultados.get(paciente.id, (0, Decimal(0)))
-        cumpriu_meta = (
-            paciente.meta_kcal is not None
-            and quantidade >= 2
-            and calorias <= paciente.meta_kcal * PERCENTUAL_MAXIMO_DA_META
-        )
-        if cumpriu_meta:
+        if cumpriu_meta_do_dia(paciente.meta_kcal, quantidade, calorias):
             paciente.streak += 1
-            paciente.xp += XP_POR_DIA
+            registrar_xp(db, paciente, XP_POR_DIA, f"meta_diaria:{dia.isoformat()}")
         elif paciente.streak > 0 and paciente.bloqueios_perda > 0:
             paciente.bloqueios_perda -= 1
         else:

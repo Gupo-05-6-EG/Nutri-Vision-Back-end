@@ -11,6 +11,7 @@ from app.core.tempo import em_fuso_local, intervalo_do_dia
 from app.models.paciente import Paciente
 from app.models.refeicao import CAMPOS_NUTRICIONAIS, ItemRefeicao, Refeicao, TipoRefeicao, somar
 from app.schemas.refeicao import ItemRefeicaoCreate, RefeicaoCreate, RefeicaoUpdate
+from app.services.gamificacao import xp_por_refeicao
 
 # Janelas de horario (hora local, no fuso oficial - ver app/core/tempo.py) usadas
 # para sugerir o tipo quando o cliente nao informa um.
@@ -81,6 +82,7 @@ def criar_refeicao(db: Session, dados: RefeicaoCreate) -> Refeicao:
         itens=[ItemRefeicao(**item.model_dump()) for item in dados.itens],
     )
     db.add(refeicao)
+    xp_por_refeicao(db, refeicao, por_foto=dados.origem == "foto")
     db.commit()
     db.refresh(refeicao)
     return refeicao
@@ -185,6 +187,7 @@ def criar_refeicoes_em_lote(
             itens=[ItemRefeicao(**item.model_dump()) for item in dados.itens],
         )
         db.add(refeicao)
+        xp_por_refeicao(db, refeicao, por_foto=dados.origem == "foto")
         conhecidas[chave] = refeicao
         novas.append(refeicao)
         resultado.append((refeicao, False))

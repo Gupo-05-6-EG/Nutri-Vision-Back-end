@@ -17,8 +17,8 @@ def test_fechamento_concede_marco_de_ofensiva(client: TestClient, db: Session) -
     paciente = _paciente(db)
     paciente.streak = 29
     db.commit()
-    _refeicao(db, paciente.id, 8, "100")
-    _refeicao(db, paciente.id, 12, "100")
+    _refeicao(db, paciente.id, 8, "1000")
+    _refeicao(db, paciente.id, 12, "1000")
     headers = factories.headers_de(paciente.id)
     antes = client.get(URL, headers=headers)
     assert antes.status_code == 200

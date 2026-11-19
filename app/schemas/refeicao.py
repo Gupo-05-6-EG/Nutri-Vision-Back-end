@@ -11,6 +11,7 @@ Decisoes de contrato desta API:
 
 from datetime import UTC, date, datetime
 from decimal import Decimal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
@@ -87,6 +88,8 @@ class RefeicaoCreate(BaseModel):
     tipo: TipoRefeicao | None = None
     observacao: str | None = Field(default=None, max_length=500)
     itens: list[ItemRefeicaoCreate] = Field(min_length=1)
+    # Como o paciente registrou: a refeicao por foto rende mais XP (nao e gravado).
+    origem: Literal["manual", "foto"] = "manual"
 
 
 class RefeicaoUpdate(BaseModel):
