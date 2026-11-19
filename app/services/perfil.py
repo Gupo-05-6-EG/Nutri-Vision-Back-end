@@ -90,6 +90,26 @@ def _fator(nivel: str | None) -> Decimal | None:
         return None
 
 
+def _nutricionista_com_status(
+    db: Session, paciente_id: int, status: StatusVinculo
+) -> tuple[Usuario, Nutricionista] | None:
+    linha = db.execute(
+        select(Usuario, Nutricionista)
+        .join(Vinculo, Vinculo.nutricionista_id == Usuario.id)
+        .join(Nutricionista, Nutricionista.id == Usuario.id)
+        .where(Vinculo.paciente_id == paciente_id, Vinculo.status == status.value)
+        .order_by(Vinculo.id.desc())
+    ).first()
+    return (linha[0], linha[1]) if linha else None
+
+
+def _resumo(linha: tuple[Usuario, Nutricionista] | None) -> NutricionistaResumo | None:
+    if linha is None:
+        return None
+    usuario, nutricionista = linha
+    return NutricionistaResumo(id=usuario.id, nome=usuario.nome, crn=nutricionista.crn)
+
+
 def montar_perfil(db: Session, paciente_id: int) -> PerfilPacienteOut:
     paciente = db.get(Paciente, paciente_id)
     usuario = db.get(Usuario, paciente_id)
@@ -102,13 +122,10 @@ def montar_perfil(db: Session, paciente_id: int) -> PerfilPacienteOut:
     refeicoes = db.scalar(
         select(func.count(Refeicao.id)).where(Refeicao.paciente_id == paciente_id)
     )
-    vinculo = db.execute(
-        select(Usuario, Nutricionista)
-        .join(Vinculo, Vinculo.nutricionista_id == Usuario.id)
-        .join(Nutricionista, Nutricionista.id == Usuario.id)
-        .where(Vinculo.paciente_id == paciente_id, Vinculo.status == StatusVinculo.ATIVO.value)
-        .order_by(Vinculo.id.desc())
-    ).first()
+    vinculo = _nutricionista_com_status(db, paciente_id, StatusVinculo.ATIVO)
+    pendente = (
+        None if vinculo else _nutricionista_com_status(db, paciente_id, StatusVinculo.PENDENTE)
+    )
     plano = plano_ativo(db, paciente_id)
 
     return PerfilPacienteOut(
@@ -141,11 +158,8 @@ def montar_perfil(db: Session, paciente_id: int) -> PerfilPacienteOut:
             xp_para_proxima=falta,
             refeicoes_registradas=refeicoes or 0,
         ),
-        nutricionista=(
-            NutricionistaResumo(id=vinculo[0].id, nome=vinculo[0].nome, crn=vinculo[1].crn)
-            if vinculo
-            else None
-        ),
+        nutricionista=_resumo(vinculo),
+        vinculo_pendente=_resumo(pendente),
         plano_ativo=(
             PlanoResumo(id=plano.id, titulo=plano.titulo, versao=plano.versao) if plano else None
         ),

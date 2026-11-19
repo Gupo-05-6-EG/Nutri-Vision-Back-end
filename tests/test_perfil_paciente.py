@@ -159,3 +159,30 @@ def test_divisoes(xp: int, esperado: tuple) -> None:
 )
 def test_classificacao_imc(imc: str, faixa: str) -> None:
     assert classificar_imc(Decimal(imc)) == faixa
+
+
+def test_perfil_mostra_o_convite_pendente(
+    client: TestClient, db: Session, paciente: Paciente
+) -> None:
+    """Vinculo resgatado e nao aceito aparece como convite, sem dar acesso (BE-17)."""
+    from app.models.vinculo import Vinculo
+
+    db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=PACIENTE, status="pendente"))
+    db.commit()
+
+    dados = client.get(URL, headers=factories.headers_de(PACIENTE)).json()
+
+    assert dados["nutricionista"] is None
+    assert dados["vinculo_pendente"]["id"] == NUTRI
+    assert dados["vinculo_pendente"]["crn"]
+
+
+def test_vinculo_ativo_nao_e_convite(client: TestClient, db: Session, paciente: Paciente) -> None:
+    from app.models.vinculo import Vinculo
+
+    db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=PACIENTE, status="ativo"))
+    db.commit()
+    dados = client.get(URL, headers=factories.headers_de(PACIENTE)).json()
+
+    assert dados["nutricionista"]["id"] == NUTRI
+    assert dados["vinculo_pendente"] is None

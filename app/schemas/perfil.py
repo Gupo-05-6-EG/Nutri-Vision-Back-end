@@ -61,6 +61,8 @@ class PerfilPacienteOut(BaseModel):
     meta: MetaDiariaOut
     gamificacao: GamificacaoPerfilOut
     nutricionista: NutricionistaResumo | None
+    # Convite resgatado e ainda nao aceito: o app oferece Aceitar/Recusar.
+    vinculo_pendente: NutricionistaResumo | None = None
     plano_ativo: PlanoResumo | None
 
     @field_serializer("peso_kg", "altura_cm", "imc", "tmb_kcal", "fator_atividade")
