@@ -121,7 +121,7 @@ def _requisicoes_protegidas(refeicao_id: int) -> list[tuple[str, str, dict[str, 
         ("GET", "/gamificacao", {}),
         ("GET", "/gamificacao/leaderboard", {}),
         ("GET", "/gamificacao/historico-xp", {}),
-        ("POST", "/amizades", {"json": {"amigo_id": PACIENTE_2}}),
+        ("POST", "/amizades", {"json": {"email": "paciente2@exemplo.com"}}),
         ("GET", "/amizades", {}),
         ("PUT", "/amizades/1/responder", {"json": {"aceitar": True}}),
         ("DELETE", "/amizades/1", {}),
@@ -165,7 +165,7 @@ def test_xp_nao_pode_mais_ser_concedido_pela_api(client: TestClient) -> None:
         ("GET", "/gamificacao/leaderboard", {}),
         ("GET", "/gamificacao/historico-xp", {}),
         ("GET", "/amizades", {}),
-        ("POST", "/amizades", {"json": {"amigo_id": PACIENTE_2}}),
+        ("POST", "/amizades", {"json": {"email": "paciente2@exemplo.com"}}),
     ],
 )
 def test_social_e_so_para_paciente(
@@ -178,7 +178,7 @@ def test_amizade_nao_e_criada_em_nome_de_outro(client: TestClient) -> None:
     """O corpo nao escolhe mais o solicitante: vale o paciente do token."""
     resposta = client.post(
         f"{API}/amizades",
-        json={"paciente_id": PACIENTE_2, "amigo_id": PACIENTE_2},
+        json={"paciente_id": PACIENTE_2, "email": "paciente2@exemplo.com"},
         headers=como(PACIENTE_1),
     )
     assert resposta.status_code == 201

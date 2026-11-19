@@ -31,13 +31,13 @@ AmizadeId = Annotated[int, Path(gt=0, description="Id do registro de amizade")]
     "",
     response_model=AmizadeOut,
     status_code=status.HTTP_201_CREATED,
-    summary="Envia uma solicitacao de amizade para outro paciente",
+    summary="Convida outro paciente pelo e-mail com que ele se cadastrou",
 )
 def solicitar_amizade(
     dados: SolicitacaoAmizadeCreate, db: DbSession, usuario: PacienteAtual
 ) -> AmizadeOut:
     try:
-        amizade = servico.solicitar_amizade(db, pac_id=usuario.id, amigo_id=dados.amigo_id)
+        amizade = servico.solicitar_amizade_por_email(db, pac_id=usuario.id, email=dados.email)
     except servico.AutoAmizadeNaoPermitida:
         raise HTTPException(
             status.HTTP_422_UNPROCESSABLE_ENTITY,

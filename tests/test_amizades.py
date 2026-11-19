@@ -39,7 +39,7 @@ class TestSolicitacaoAmizade:
     ) -> None:
         resposta = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         assert resposta.status_code == 201
@@ -51,7 +51,7 @@ class TestSolicitacaoAmizade:
     def test_impede_auto_amizade(self, client: TestClient, paciente_a: Paciente) -> None:
         resposta = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_a.id},
+            json={"email": f"paciente{paciente_a.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         assert resposta.status_code == 422
@@ -62,7 +62,7 @@ class TestSolicitacaoAmizade:
     ) -> None:
         resposta = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": 9999},
+            json={"email": "ninguem@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         assert resposta.status_code == 404
@@ -72,12 +72,12 @@ class TestSolicitacaoAmizade:
     ) -> None:
         client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         resposta = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         assert resposta.status_code == 409
@@ -89,13 +89,13 @@ class TestSolicitacaoAmizade:
         # A envia para B
         client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         # B também envia para A (convite cruzado)
         resposta = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_a.id},
+            json={"email": f"paciente{paciente_a.id}@exemplo.com"},
             headers=factories.headers_de(paciente_b.id),
         )
         assert resposta.status_code == 201
@@ -108,7 +108,7 @@ class TestRespostaSolicitacao:
     ) -> None:
         post_resp = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = post_resp.json()["id"]
@@ -126,7 +126,7 @@ class TestRespostaSolicitacao:
     ) -> None:
         post_resp = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = post_resp.json()["id"]
@@ -148,7 +148,7 @@ class TestRespostaSolicitacao:
     ) -> None:
         post_resp = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = post_resp.json()["id"]
@@ -172,7 +172,7 @@ class TestListagemAmizades:
         # A envia para B e B aceita
         r1 = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         client.put(
@@ -184,7 +184,7 @@ class TestListagemAmizades:
         # C envia para A (fica pendente)
         client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_a.id},
+            json={"email": f"paciente{paciente_a.id}@exemplo.com"},
             headers=factories.headers_de(paciente_c.id),
         )
 
@@ -213,7 +213,7 @@ class TestRemoverAmizade:
     ) -> None:
         r = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = r.json()["id"]
@@ -236,7 +236,7 @@ class TestRemoverAmizade:
     ) -> None:
         r = client.post(
             "/api/v1/amizades",
-            json={"amigo_id": paciente_b.id},
+            json={"email": f"paciente{paciente_b.id}@exemplo.com"},
             headers=factories.headers_de(paciente_a.id),
         )
         amizade_id = r.json()["id"]
@@ -245,3 +245,33 @@ class TestRemoverAmizade:
             f"/api/v1/amizades/{amizade_id}", headers=factories.headers_de(paciente_c.id)
         )
         assert del_resp.status_code == 403
+
+
+class TestConvitePorEmail:
+    def test_email_e_comparado_sem_diferenciar_maiusculas(
+        self, client: TestClient, paciente_a: Paciente, paciente_b: Paciente
+    ) -> None:
+        resposta = client.post(
+            "/api/v1/amizades",
+            json={"email": "  PACIENTE2@Exemplo.com "},
+            headers=factories.headers_de(paciente_a.id),
+        )
+        assert resposta.status_code == 201
+        assert resposta.json()["amigo_id"] == paciente_b.id
+
+    def test_email_de_nutricionista_nao_vira_amigo(
+        self, client: TestClient, db: Session, paciente_a: Paciente
+    ) -> None:
+        factories.criar_nutricionista(db, 50)
+        resposta = client.post(
+            "/api/v1/amizades",
+            json={"email": "nutri50@exemplo.com"},
+            headers=factories.headers_de(paciente_a.id),
+        )
+        assert resposta.status_code == 404
+
+    def test_email_invalido_e_422(self, client: TestClient, paciente_a: Paciente) -> None:
+        resposta = client.post(
+            "/api/v1/amizades", json={"email": "nao-e-email"}, headers=factories.headers_de(1)
+        )
+        assert resposta.status_code == 422

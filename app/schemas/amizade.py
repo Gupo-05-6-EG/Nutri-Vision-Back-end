@@ -2,15 +2,19 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.amizade import StatusAmizade
 
 
 class SolicitacaoAmizadeCreate(BaseModel):
-    """Payload para enviar uma nova solicitacao de amizade (o solicitante vem do token)."""
+    """Convite pelo e-mail exato do amigo (o solicitante vem do token).
 
-    amigo_id: int = Field(gt=0, description="Id do paciente convidado")
+    Pelo e-mail, e nao pelo id: o paciente nao precisa conhecer ids internos, e a
+    API nao expoe uma lista de usuarios para busca.
+    """
+
+    email: EmailStr = Field(description="E-mail com que o amigo se cadastrou")
 
 
 class RespostaSolicitacao(BaseModel):

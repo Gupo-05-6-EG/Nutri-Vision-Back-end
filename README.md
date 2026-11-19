@@ -594,7 +594,7 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | POST | `/api/v1/analises` | Envia a foto do prato para a IA analisar (multipart `file`, 🔒 paciente) |
 | GET | `/api/v1/analises/{id}` | Andamento e resultado da análise: alimentos da TACO com kcal/macros das gramas estimadas (🔒 paciente) |
 | POST | `/api/v1/calculo-nutricional` | Calcula kcal/macros por porção, por id da TACO ou classe da IA (RF03, RF20, RF21) |
-| POST | `/api/v1/amizades` | Envia uma solicitação de amizade para outro paciente (RF05) |
+| POST | `/api/v1/amizades` | Convida outro paciente pelo e-mail exato com que ele se cadastrou (`{"email": ...}`, RF05) |
 | PUT | `/api/v1/amizades/{id}/responder` | Aceita ou recusa convite de amizade recebido (RF05) |
 | GET | `/api/v1/amizades?status=` | Lista amigos e convites do paciente logado (RF05) |
 | DELETE | `/api/v1/amizades/{id}` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
