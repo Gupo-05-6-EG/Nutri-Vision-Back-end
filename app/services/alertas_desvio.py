@@ -22,6 +22,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.core.tempo import FUSO as FUSO_HORARIO
+from app.core.tempo import ontem_local
 from app.models.alerta_desvio import AlertaDesvioPlano, DirecaoDesvio, RegraAlertaDesvio
 from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao
@@ -168,6 +169,18 @@ def _avaliar_janela_paciente(
     meta_arredondada = meta_kcal.quantize(DUAS_CASAS, rounding=ROUND_HALF_UP)
 
     return direcao_final, meta_arredondada, consumo_medio, desvio_medio
+
+
+def fechar_alertas_do_dia_anterior(
+    db: Session, notificar: NotificarNutricionista = notificar_nutricionista_log
+) -> tuple[date, int]:
+    """Avalia a janela que termina ontem, o ultimo dia completo.
+
+    Rodar de novo no mesmo dia nao duplica: ja existe no maximo um alerta por
+    paciente e nutricionista para cada data de referencia.
+    """
+    dia = ontem_local()
+    return dia, processar_alertas_desvio_diario(db, dia, notificar)
 
 
 def processar_alertas_desvio_diario(

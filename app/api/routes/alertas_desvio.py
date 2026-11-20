@@ -6,7 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from app.api.deps import exigir_perfil
-from app.core.tempo import hoje_local
+from app.core.tempo import ontem_local
 from app.db.deps import DbSession
 from app.models.usuario import Perfil, Usuario
 from app.schemas.alerta_desvio import (
@@ -71,13 +71,17 @@ def listar_alertas(
     "/processar",
     response_model=ProcessamentoAlertasOut,
     summary="Avalia desvios de meta para os pacientes vinculados ao nutricionista",
+    description=(
+        "Avalia a janela de dias consecutivos que termina em `dia_referencia` "
+        "(padrao: ontem). O dia de hoje ainda esta em andamento e fica de fora."
+    ),
 )
 def processar_alertas(
     db: DbSession,
     nutricionista: NutricionistaAutenticado,
     dia_referencia: Annotated[date | None, Query()] = None,
 ) -> ProcessamentoAlertasOut:
-    dia = dia_referencia or hoje_local()
+    dia = dia_referencia or ontem_local()
     gerados = servico.processar_alertas_desvio_diario(
         db,
         dia,

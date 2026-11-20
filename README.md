@@ -390,23 +390,34 @@ um registro em `historico_xp`, que alimenta o ranking semanal.
 | Dia dentro da meta (fechamento diário) | 50 |
 | Incentivo do nutricionista vinculado (uma vez por dia) | 10 |
 
-**Agendamento.** No `docker compose up` o serviço `gamificacao` faz o papel do
-cron: ao subir, fecha os dias pendentes e depois fecha, todo dia às 00:05 de São
-Paulo (`GAMIFICACAO_HORARIO`), o dia que acabou. O dia só é fechado depois de
-terminar, então as refeições até 23:59 contam. Se o serviço ficar parado, ele
-recupera até 7 dias quando voltar.
+**Agendamento.** No `docker compose up` o serviço `agendador` faz o papel do
+cron para os dois fechamentos diários: a ofensiva (com o XP do dia na meta) e os
+alertas de desvio de meta. Ao subir, e depois todo dia às 00:05 de São Paulo
+(`AGENDADOR_HORARIO`), ele fecha o dia que acabou. O dia só é fechado depois de
+terminar, então as refeições até 23:59 contam. Se o serviço ficar parado, a
+ofensiva recupera até 7 dias quando ele voltar. Uma falha num fechamento vai para
+o log e não impede o outro.
 
-Sem Docker, agende o mesmo script pelo cron do ambiente:
+Os **alertas de desvio** avaliam a janela de dias consecutivos que termina
+**ontem**, o último dia completo: com a regra "2 dias", compara ontem e
+anteontem. O dia de hoje, ainda em andamento, fica de fora, então um café da manhã
+sozinho não vira alerta "abaixo da meta". O botão "Verificar desvios agora" do
+painel (`POST /alertas-desvio/processar`) usa a mesma janela. Rodar de novo não
+duplica: há no máximo um alerta por paciente para cada data de referência.
+
+Sem Docker, agende os dois scripts pelo cron do ambiente:
 
 ```cron
 CRON_TZ=America/Sao_Paulo
 5 0 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_gamificacao
+6 0 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_alertas_desvio
 ```
 
 No Windows, configure o Agendador de Tarefas para executar diariamente às 00:05
-o interpretador `.venv\Scripts\python.exe`, com argumento
-`-m scripts.processar_gamificacao` e diretório de trabalho na raiz do projeto.
-Para refazer um dia específico: `python -m scripts.processar_gamificacao --dia 2026-11-19`.
+o interpretador `.venv\Scripts\python.exe`, com os argumentos
+`-m scripts.processar_gamificacao` e `-m scripts.processar_alertas_desvio`, e
+diretório de trabalho na raiz do projeto. Para refazer um dia específico, os dois
+aceitam `--dia AAAA-MM-DD` (nos alertas, o último dia da janela).
 O campo `gamificacao_processada_em` impede crédito duplicado se o job for
 executado de novo para o mesmo dia.
 
