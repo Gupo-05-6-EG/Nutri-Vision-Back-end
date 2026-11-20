@@ -2,7 +2,7 @@
 
 Sem argumento, fecha os dias pendentes ate ontem (dia local de Sao Paulo). Com
 `--dia AAAA-MM-DD`, fecha so aquele dia. Em producao quem chama e o servico
-`gamificacao` do docker-compose (scripts/agendador_gamificacao.py), as 00:05.
+`agendador` do docker-compose (scripts/agendador.py), as 00:05.
 """
 
 import argparse

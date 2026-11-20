@@ -25,6 +25,11 @@ def hoje_local() -> date:
     return agora_local().date()
 
 
+def ontem_local() -> date:
+    """Ultimo dia completo no fuso oficial (os fechamentos diarios usam este)."""
+    return hoje_local() - timedelta(days=1)
+
+
 def em_fuso_local(momento: datetime) -> datetime:
     """Converte para o fuso local. Sem fuso, assume que o valor esta em UTC."""
     if momento.tzinfo is None:

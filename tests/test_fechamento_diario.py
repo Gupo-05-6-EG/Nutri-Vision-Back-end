@@ -17,7 +17,7 @@ from app.services.gamificacao import (
     fechar_dias_pendentes,
     processar_gamificacao_diaria,
 )
-from scripts import agendador_gamificacao, processar_gamificacao
+from scripts import agendador, processar_gamificacao
 from tests import factories
 
 DIA = date(2026, 11, 18)
@@ -158,8 +158,8 @@ def test_agendador_calcula_a_proxima_execucao() -> None:
     antes = datetime(2026, 11, 19, 0, 1, tzinfo=FUSO_HORARIO)
     depois = datetime(2026, 11, 19, 15, 0, tzinfo=FUSO_HORARIO)
 
-    assert agendador_gamificacao.proxima_execucao(antes, "00:05") == antes.replace(minute=5)
-    assert agendador_gamificacao.proxima_execucao(depois, "00:05") == datetime(
+    assert agendador.proxima_execucao(antes, "00:05") == antes.replace(minute=5)
+    assert agendador.proxima_execucao(depois, "00:05") == datetime(
         2026, 11, 20, 0, 5, tzinfo=FUSO_HORARIO
     )
 
@@ -167,31 +167,31 @@ def test_agendador_calcula_a_proxima_execucao() -> None:
 def test_agendador_executa_e_nao_cai_com_erro(db: Session, monkeypatch: pytest.MonkeyPatch) -> None:
     paciente = _paciente(db, meta="1000")
     _refeicoes(db, 1, "500")
-    monkeypatch.setattr(agendador_gamificacao, "SessionLocal", lambda: nullcontext(db))
+    monkeypatch.setattr(agendador, "SessionLocal", lambda: nullcontext(db))
     monkeypatch.setattr(
-        agendador_gamificacao, "fechar_dias_pendentes", lambda s: fechar_dias_pendentes(s, ate=DIA)
+        agendador, "fechar_dias_pendentes", lambda s: fechar_dias_pendentes(s, ate=DIA)
     )
-    agendador_gamificacao.executar()
+    agendador.executar()
     assert paciente.streak == 1
 
     def falha(_db: Session) -> list:
         raise RuntimeError("banco fora")
 
-    monkeypatch.setattr(agendador_gamificacao, "fechar_dias_pendentes", falha)
-    agendador_gamificacao.executar()  # registra no log e segue
+    monkeypatch.setattr(agendador, "fechar_dias_pendentes", falha)
+    agendador.executar()  # registra no log e segue
 
 
 def test_agendador_roda_ao_subir_e_depois_no_horario(monkeypatch: pytest.MonkeyPatch) -> None:
     chamadas = []
-    monkeypatch.setattr(agendador_gamificacao, "executar", lambda: chamadas.append("x"))
+    monkeypatch.setattr(agendador, "executar", lambda: chamadas.append("x"))
 
     def dormir(segundos: float) -> None:
         assert segundos >= 1
         if len(chamadas) >= 2:
             raise KeyboardInterrupt
 
-    monkeypatch.setattr(agendador_gamificacao.time, "sleep", dormir)
+    monkeypatch.setattr(agendador.time, "sleep", dormir)
     with pytest.raises(KeyboardInterrupt):
-        agendador_gamificacao.main()
+        agendador.main()
 
     assert len(chamadas) == 2
