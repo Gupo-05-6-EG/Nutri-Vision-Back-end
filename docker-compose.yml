@@ -32,6 +32,23 @@ services:
       - ./alembic:/app/alembic
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  # Fechamento diario da gamificacao (ofensiva e +50 XP do dia na meta): roda
+  # como um cron as 00:05 de Sao Paulo e, ao subir, fecha os dias pendentes.
+  gamificacao:
+    build: .
+    container_name: nutrivision-gamificacao
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-nutrivision}:${POSTGRES_PASSWORD:-nutrivision}@db:5432/${POSTGRES_DB:-nutrivision}
+      GAMIFICACAO_HORARIO: ${GAMIFICACAO_HORARIO:-00:05}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      disable: true
+    command: python -m scripts.agendador_gamificacao
+
   # Backup diario + teste semanal de restauracao (Task 7.2, RNF10).
   # BACKUP_HOST_DIR deve ficar fora do disco do banco (outro disco, NAS, pasta
   # sincronizada com a nuvem...).

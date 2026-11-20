@@ -21,6 +21,7 @@ from app.api.routes import (
     refeicoes,
     relatorios,
     vinculos,
+    visao_geral,
 )
 
 api_router = APIRouter()
@@ -42,3 +43,4 @@ api_router.include_router(vinculos.router)
 api_router.include_router(desafios.router)
 api_router.include_router(amizades.router)
 api_router.include_router(gamificacao.router)
+api_router.include_router(visao_geral.router)

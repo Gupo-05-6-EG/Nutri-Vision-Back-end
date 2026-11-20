@@ -8,6 +8,7 @@ from app.core.security import HASH_FICTICIO, gerar_hash_senha, verificar_senha
 from app.models.paciente import Paciente
 from app.models.usuario import Nutricionista, Perfil, Usuario
 from app.schemas.auth import CadastroNutricionistaIn, CadastroPacienteIn
+from app.services.gamificacao import XP_BOAS_VINDAS, registrar_xp
 
 
 class EmailJaCadastrado(Exception):
@@ -55,7 +56,9 @@ def _salvar(db: Session, usuario: Usuario) -> Usuario:
 def cadastrar_paciente(db: Session, dados: CadastroPacienteIn) -> Usuario:
     """Cria o usuario e o paciente vazio (a triagem preenche depois)."""
     usuario = _novo_usuario(db, dados, Perfil.PACIENTE)
-    db.add(Paciente(id=usuario.id))
+    paciente = Paciente(id=usuario.id, nome=usuario.nome[:100], xp=0)
+    db.add(paciente)
+    registrar_xp(db, paciente, XP_BOAS_VINDAS, "boas_vindas")
     return _salvar(db, usuario)
 
 

@@ -1,8 +1,8 @@
 """Endpoints do fluxo de vinculacao (Task 1.4)."""
 
-from typing import Annotated
+from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from app.api.deps import exigir_perfil
 from app.db.deps import DbSession
@@ -10,7 +10,9 @@ from app.models.usuario import Perfil, Usuario
 from app.schemas.vinculo import (
     CodigoVinculacaoCreateOut,
     CodigoVinculacaoIn,
+    NutricionistaPublicoOut,
     PacienteVinculadoOut,
+    PreviaCodigoOut,
     StatusVinculoOut,
     VinculoCriadoOut,
 )
@@ -132,11 +134,47 @@ def _responder_vinculo(db, usuario, nutricionista_id: int, *, aceitar: bool) -> 
     return _resposta_status(vinculo)
 
 
+@router.get(
+    "/linking-code/{codigo}/previa",
+    response_model=PreviaCodigoOut,
+    summary="Mostra quem gerou um codigo valido, antes de o paciente criar a conta",
+    responses={404: {"description": "Codigo inexistente, expirado ou ja usado"}},
+)
+def previa_do_codigo(
+    db: DbSession,
+    codigo: Annotated[str, Path(pattern=r"^\d{6}$", description="Codigo de 6 digitos")],
+) -> PreviaCodigoOut:
+    """Publica de proposito: o paciente ainda nao tem conta quando digita o codigo.
+
+    Devolve so o nome e o CRN do profissional (dados publicos de registro), nada
+    do paciente. Codigos expiram (LINKING_CODE_EXPIRE_MINUTES) e qualquer
+    codigo invalido responde o mesmo 404.
+    """
+    previa = servico.previa_do_codigo(db, codigo)
+    if previa is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Codigo invalido ou expirado")
+    registro, nutricionista = previa
+    return PreviaCodigoOut(
+        nutricionista=NutricionistaPublicoOut(
+            id=registro.nutricionista_id,
+            nome=registro.nutricionista_nome,
+            foto_url=registro.nutricionista_foto_url,
+        ),
+        crn=nutricionista.crn,
+        expira_em=registro.expira_em,
+    )
+
+
 @router.get("/patients", response_model=list[PacienteVinculadoOut])
 def listar_pacientes_vinculados(
     db: DbSession,
     usuario: NutricionistaAutenticado,
     busca: str | None = Query(default=None, max_length=120),
+    status_vinculo: Literal["ativo", "pendente", "todos"] = Query(
+        default="ativo",
+        alias="status",
+        description="ativo (padrao), pendente (resgatou o codigo e nao aceitou) ou todos",
+    ),
 ) -> list[PacienteVinculadoOut]:
     return [
         PacienteVinculadoOut(
@@ -146,7 +184,7 @@ def listar_pacientes_vinculados(
             status=vinculo.status,
             vinculado_em=vinculo.criado_em,
         )
-        for vinculo, paciente in servico.listar_pacientes(db, usuario, busca)
+        for vinculo, paciente in servico.listar_pacientes(db, usuario, busca, status_vinculo)
     ]
 
 

@@ -36,8 +36,10 @@ from app.services import refeicoes as servico
 router = APIRouter(prefix="/refeicoes", tags=["refeicoes"])
 
 PacienteId = Annotated[int, Query(gt=0, description="Id do paciente")]
-Dia = Annotated[date, Query(description="Dia do consumo (YYYY-MM-DD, em UTC)")]
-DiaOpcional = Annotated[date | None, Query(description="Filtra por um dia (YYYY-MM-DD, em UTC)")]
+Dia = Annotated[date, Query(description="Dia do consumo (YYYY-MM-DD, no fuso local)")]
+DiaOpcional = Annotated[
+    date | None, Query(description="Filtra por um dia (YYYY-MM-DD, no fuso local)")
+]
 TipoOpcional = Annotated[
     TipoRefeicao | None,
     Query(description="Filtra por tipo: cafe_da_manha, almoco, lanche ou jantar"),

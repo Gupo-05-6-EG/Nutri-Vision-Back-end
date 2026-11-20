@@ -10,9 +10,9 @@ from app.models.auditoria import EntidadeAuditada
 from app.models.paciente import Paciente
 from app.models.plano_alimentar import AlimentoRefeicaoPlano, PlanoAlimentar, RefeicaoPlano
 from app.models.usuario import Perfil, Usuario
-from app.models.vinculo import Vinculo
 from app.schemas.plano_alimentar import PlanoAlimentarIn, PlanoAlimentarOut
 from app.services.auditoria import registrar_auditoria
+from app.services.vinculos import nutricionista_vinculado
 
 
 class PacienteNaoEncontrado(Exception):
@@ -38,12 +38,7 @@ def _exigir_acesso(db: Session, usuario: Usuario, paciente_id: int) -> None:
         if usuario.id != paciente_id:
             raise AcessoNegado
         return
-    vinculado = db.execute(
-        select(Vinculo.id).where(
-            Vinculo.nutricionista_id == usuario.id, Vinculo.paciente_id == paciente_id
-        )
-    ).first()
-    if vinculado is None:
+    if not nutricionista_vinculado(db, usuario.id, paciente_id):
         raise AcessoNegado
 
 
@@ -59,6 +54,10 @@ def _conferir_alimentos_taco(db: Session, dados: PlanoAlimentarIn) -> None:
     encontrados = set(db.execute(select(AlimentoTaco.id).where(AlimentoTaco.id.in_(ids))).scalars())
     if encontrados != ids:
         raise AlimentoTacoNaoEncontrado
+
+
+class RascunhoNaoEncontrado(Exception):
+    """O nutricionista nao guardou rascunho para este paciente."""
 
 
 class Autor(NamedTuple):
@@ -120,6 +119,8 @@ def prescrever_plano(
                 horario=refeicao.horario,
                 meta_kcal=refeicao.meta_kcal,
                 meta_proteinas_g=refeicao.meta_proteinas_g,
+                meta_carboidratos_g=refeicao.meta_carboidratos_g,
+                meta_gorduras_g=refeicao.meta_gorduras_g,
                 observacao=refeicao.observacao,
                 alimentos=[
                     AlimentoRefeicaoPlano(ordem=posicao, **alimento.model_dump())
@@ -166,10 +167,87 @@ def historico_de_versoes(
     linhas = db.execute(
         select(PlanoAlimentar, Usuario.id, Usuario.nome)
         .outerjoin(Usuario, Usuario.id == PlanoAlimentar.nutricionista_id)
-        .where(PlanoAlimentar.paciente_id == paciente_id)
+        .where(PlanoAlimentar.paciente_id == paciente_id, PlanoAlimentar.rascunho.is_(False))
         .order_by(PlanoAlimentar.versao.desc())
     ).all()
     return [
         (plano, Autor(autor_id, autor_nome) if autor_id is not None else None)
         for plano, autor_id, autor_nome in linhas
     ]
+
+
+RASCUNHO_VERSAO = 0
+
+
+def _rascunho_ou_none(db: Session, paciente_id: int) -> PlanoAlimentar | None:
+    return db.execute(
+        select(PlanoAlimentar).where(
+            PlanoAlimentar.paciente_id == paciente_id, PlanoAlimentar.rascunho.is_(True)
+        )
+    ).scalar_one_or_none()
+
+
+def _blocos(dados: PlanoAlimentarIn) -> list[RefeicaoPlano]:
+    return [
+        RefeicaoPlano(
+            ordem=ordem,
+            nome=refeicao.nome,
+            horario=refeicao.horario,
+            meta_kcal=refeicao.meta_kcal,
+            meta_proteinas_g=refeicao.meta_proteinas_g,
+            meta_carboidratos_g=refeicao.meta_carboidratos_g,
+            meta_gorduras_g=refeicao.meta_gorduras_g,
+            observacao=refeicao.observacao,
+            alimentos=[
+                AlimentoRefeicaoPlano(ordem=posicao, **alimento.model_dump())
+                for posicao, alimento in enumerate(refeicao.alimentos)
+            ],
+        )
+        for ordem, refeicao in enumerate(dados.refeicoes)
+    ]
+
+
+def salvar_rascunho(
+    db: Session, nutricionista: Usuario, paciente_id: int, dados: PlanoAlimentarIn
+) -> PlanoAlimentar:
+    """Guarda (ou substitui) o rascunho do plano. Nao vale para o paciente ainda."""
+    _exigir_acesso(db, nutricionista, paciente_id)
+    _conferir_alimentos_taco(db, dados)
+    rascunho = _rascunho_ou_none(db, paciente_id)
+    if rascunho is None:
+        rascunho = PlanoAlimentar(
+            paciente_id=paciente_id, versao=RASCUNHO_VERSAO, ativo=False, rascunho=True
+        )
+        db.add(rascunho)
+    rascunho.nutricionista_id = nutricionista.id
+    rascunho.titulo = dados.titulo
+    rascunho.observacao = dados.observacao
+    rascunho.refeicoes = _blocos(dados)
+    db.commit()
+    db.refresh(rascunho)
+    return rascunho
+
+
+def obter_rascunho(db: Session, nutricionista: Usuario, paciente_id: int) -> PlanoAlimentar:
+    _exigir_acesso(db, nutricionista, paciente_id)
+    if nutricionista.perfil != Perfil.NUTRICIONISTA:
+        raise AcessoNegado
+    rascunho = _rascunho_ou_none(db, paciente_id)
+    if rascunho is None:
+        raise RascunhoNaoEncontrado
+    return rascunho
+
+
+def descartar_rascunho(db: Session, nutricionista: Usuario, paciente_id: int) -> None:
+    rascunho = obter_rascunho(db, nutricionista, paciente_id)
+    db.delete(rascunho)
+    db.commit()
+
+
+def publicar_rascunho(db: Session, nutricionista: Usuario, paciente_id: int) -> PlanoAlimentar:
+    """Prescreve o rascunho como uma versao nova (com auditoria) e apaga o rascunho."""
+    rascunho = obter_rascunho(db, nutricionista, paciente_id)
+    dados = PlanoAlimentarIn.model_validate(PlanoAlimentarOut.model_validate(rascunho).model_dump())
+    db.delete(rascunho)
+    db.flush()
+    return prescrever_plano(db, nutricionista, paciente_id, dados)

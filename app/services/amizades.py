@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.models.amizade import Amizade, StatusAmizade
 from app.models.paciente import Paciente
+from app.models.usuario import Perfil, Usuario
 from app.schemas.amizade import AmigoItem
 
 
@@ -47,6 +48,18 @@ def _garantir_paciente(db: Session, paciente_id: int) -> Paciente:
     if not paciente:
         raise PacienteNaoEncontrado(f"Paciente {paciente_id} nao encontrado")
     return paciente
+
+
+def solicitar_amizade_por_email(db: Session, pac_id: int, email: str) -> Amizade:
+    """Convite pelo e-mail exato. E-mail desconhecido (ou de nutricionista) = 404 generico."""
+    amigo_id = db.scalar(
+        select(Usuario.id).where(
+            Usuario.email == email.strip().lower(), Usuario.perfil == Perfil.PACIENTE.value
+        )
+    )
+    if amigo_id is None:
+        raise PacienteNaoEncontrado("Nenhum paciente encontrado com este e-mail")
+    return solicitar_amizade(db, pac_id, amigo_id)
 
 
 def solicitar_amizade(db: Session, pac_id: int, amigo_id: int) -> Amizade:
@@ -138,8 +151,10 @@ def listar_amizades(
             AmigoItem(
                 id=reg.id,
                 paciente_id=outro_id,
+                nome=outro.nome if outro else None,
                 username=outro.username if outro else None,
                 streak=outro.streak if outro else 0,
+                xp=outro.xp if outro else 0,
                 status=StatusAmizade(reg.status),
                 sou_solicitante=(reg.pac_id == paciente_id),
                 criado_em=reg.criado_em,

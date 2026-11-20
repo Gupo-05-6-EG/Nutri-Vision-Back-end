@@ -10,7 +10,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.models.usuario import Perfil, Usuario
+from app.core.texto import sem_acento
+from app.models.usuario import Nutricionista, Perfil, Usuario
 from app.models.vinculo import CodigoVinculacao, StatusCodigoVinculacao, StatusVinculo, Vinculo
 
 
@@ -68,16 +69,17 @@ def _gerar_codigo() -> str:
 
 
 def nutricionista_vinculado(db: Session, nutricionista_id: int, paciente_id: int) -> bool:
-    """True se o nutricionista tem vinculo com o paciente (Task 1.6, RNF06).
+    """True se o nutricionista tem vinculo **ativo** com o paciente (Task 1.6, RNF06).
 
-    Nao ha status no vinculo: quem resgatou o codigo tem vinculo ativo, e nao ha
-    fluxo de desvinculo ainda.
+    Vinculo pendente (codigo resgatado, paciente ainda nao aceitou), recusado ou
+    encerrado nao da acesso aos dados do paciente.
     """
     return (
         db.execute(
             select(Vinculo.id).where(
                 Vinculo.nutricionista_id == nutricionista_id,
                 Vinculo.paciente_id == paciente_id,
+                Vinculo.status == StatusVinculo.ATIVO.value,
             )
         ).first()
         is not None
@@ -144,6 +146,21 @@ def _buscar_codigo_ativo(db: Session, codigo: str) -> CodigoVinculacao | None:
     except Exception:
         pass
     return db.execute(stmt).scalar_one_or_none()
+
+
+def previa_do_codigo(db: Session, codigo: str) -> tuple[CodigoVinculacao, Nutricionista] | None:
+    """Codigo ativo e dentro da validade, com o nutricionista dono. Nao resgata nada."""
+    registro = db.execute(
+        select(CodigoVinculacao).where(CodigoVinculacao.codigo_hash == _hash_codigo(codigo))
+    ).scalar_one_or_none()
+    if registro is None or registro.status != StatusCodigoVinculacao.ATIVO.value:
+        return None
+    if _em_utc(registro.expira_em) <= _agora():
+        return None
+    nutricionista = db.get(Nutricionista, registro.nutricionista_id)
+    if nutricionista is None:
+        return None
+    return registro, nutricionista
 
 
 def resgatar_codigo_vinculacao(db: Session, usuario: Usuario, codigo: str) -> VinculoResgatado:
@@ -267,8 +284,17 @@ def responder_solicitacao(
     return vinculo
 
 
+STATUS_DA_LISTAGEM = {
+    "ativo": (StatusVinculo.ATIVO.value,),
+    "pendente": (StatusVinculo.PENDENTE.value,),
+    # "todos" = a carteira em andamento: ativos e os que resgataram o codigo e
+    # ainda nao aceitaram (recusados e encerrados ficam de fora).
+    "todos": (StatusVinculo.ATIVO.value, StatusVinculo.PENDENTE.value),
+}
+
+
 def listar_pacientes(
-    db: Session, nutricionista: Usuario, busca: str | None = None
+    db: Session, nutricionista: Usuario, busca: str | None = None, status: str = "ativo"
 ) -> list[tuple[Vinculo, Usuario]]:
     if nutricionista.perfil != Perfil.NUTRICIONISTA:
         raise PerfilIncompativel
@@ -277,13 +303,17 @@ def listar_pacientes(
         .join(Usuario, Usuario.id == Vinculo.paciente_id)
         .where(
             Vinculo.nutricionista_id == nutricionista.id,
-            Vinculo.status == StatusVinculo.ATIVO.value,
+            Vinculo.status.in_(STATUS_DA_LISTAGEM[status]),
         )
         .order_by(Usuario.nome, Usuario.id)
     )
-    if busca:
-        stmt = stmt.where(Usuario.nome.ilike(f"%{busca.strip()}%"))
-    return list(db.execute(stmt).all())
+    linhas = list(db.execute(stmt).all())
+    termo = sem_acento(busca)
+    if termo:
+        # Carteira de um nutricionista e pequena: filtrar aqui deixa a busca sem
+        # acento igual em qualquer banco.
+        linhas = [linha for linha in linhas if termo in sem_acento(linha[1].nome)]
+    return linhas
 
 
 def encerrar_vinculo(db: Session, nutricionista: Usuario, paciente_id: int) -> Vinculo:

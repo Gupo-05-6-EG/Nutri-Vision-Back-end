@@ -84,7 +84,7 @@ convidar outros pacientes pelo ID. O convite precisa ser aceito para a pessoa
 entrar no placar. Tipos aceitos: `refeicoes` (dias em que as quatro categorias
 de refeição foram registradas), `variacao_calorica` (menor média de diferença absoluta entre o
 consumo diário e a meta calórica) e `sequencia_meta` (maior sequência de dias
-com pelo menos duas refeições e consumo até 30% da meta, seguindo o critério
+com pelo menos duas refeições e consumo a até 30% da meta, para mais ou para menos, seguindo o critério
 do processamento diário de gamificação). A variação calórica inclui dias sem
 registro como consumo zero. As datas são enviadas com fuso horário.
 
@@ -148,8 +148,10 @@ no caminho, na query ou no corpo, e é conferido contra o token:
 | Triagem, lembretes, token de push, registrar/editar/remover refeição, cadastrar alimento personalizado | só o próprio paciente |
 | Gerar código de vinculação (`/linking-code`) | só nutricionista |
 | Resgatar código (`/link`) | só paciente |
+| Prévia do código (`/linking-code/{codigo}/previa`) | qualquer um (o paciente ainda não tem conta); só nome e CRN do profissional |
 | Busca na TACO (`/alimentos-taco`, `/alimentos` sem `paciente_id`) e `/calculo-nutricional` | qualquer usuário logado |
 | Análise de fotos pela IA (`/analises`) | só pacientes |
+| Gamificação e amizades (`/gamificacao/*`, `/amizades/*`) | só paciente, sempre em nome de quem está logado (o id vem do token) |
 
 Sem acesso a resposta é `403` — inclusive quando o paciente não existe, para a API não
 revelar quais ids existem. Ter vínculo com um paciente não dá acesso a outro.
@@ -368,25 +370,45 @@ As colunas são opcionais porque o cadastro cria o paciente antes da triagem.
 
 `streak` e `xp` guardam, respectivamente, os dias consecutivos que cumpriram a
 regra de gamificação e os pontos acumulados. O fechamento diário considera as
-refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo de
-até 30% de `meta_kcal`, soma 1 ao streak e 50 XP. Quando a regra falha,
+refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo a
+até 30% da meta do dia (para mais ou para menos), soma 1 ao streak e 50 XP. A meta
+é a mesma que o app mostra: a do plano ativo do nutricionista e, sem plano, a da
+triagem (`meta_kcal`). Os desafios de meta usam a mesma regra. Quando a regra falha,
 consome um bloqueio se houver saldo e uma ofensiva ativa. Nesse caso, mantém
 o streak e o XP. Sem proteção, zera o streak.
 O fechamento não altera XP quando a regra não é cumprida. Pacientes sem meta
 calórica também não cumprem a regra.
 
-O job pode ser agendado pelo cron do ambiente para 23:59 (horário de São Paulo):
+**XP só por regras internas** (não há rota para conceder XP): cada ganho grava
+um registro em `historico_xp`, que alimenta o ranking semanal.
+
+| Evento | XP |
+|---|---|
+| Boas-vindas, no cadastro do paciente | 50 |
+| Refeição registrada (uma por tipo de refeição por dia local) | 10 |
+| Refeição registrada por foto (`"origem": "foto"`, no lugar dos 10) | 20 |
+| Dia dentro da meta (fechamento diário) | 50 |
+| Incentivo do nutricionista vinculado (uma vez por dia) | 10 |
+
+**Agendamento.** No `docker compose up` o serviço `gamificacao` faz o papel do
+cron: ao subir, fecha os dias pendentes e depois fecha, todo dia às 00:05 de São
+Paulo (`GAMIFICACAO_HORARIO`), o dia que acabou. O dia só é fechado depois de
+terminar, então as refeições até 23:59 contam. Se o serviço ficar parado, ele
+recupera até 7 dias quando voltar.
+
+Sem Docker, agende o mesmo script pelo cron do ambiente:
 
 ```cron
 CRON_TZ=America/Sao_Paulo
-59 23 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_gamificacao
+5 0 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_gamificacao
 ```
 
-No Windows, configure o Agendador de Tarefas para executar diariamente às 23:59
+No Windows, configure o Agendador de Tarefas para executar diariamente às 00:05
 o interpretador `.venv\Scripts\python.exe`, com argumento
 `-m scripts.processar_gamificacao` e diretório de trabalho na raiz do projeto.
+Para refazer um dia específico: `python -m scripts.processar_gamificacao --dia 2026-11-19`.
 O campo `gamificacao_processada_em` impede crédito duplicado se o job for
-executado novamente no mesmo dia.
+executado de novo para o mesmo dia.
 
 No fechamento, o job concede as conquistas de 30 dias de ofensiva e 100
 refeições registradas. A conquista fica registrada mesmo se a ofensiva cair
@@ -556,7 +578,9 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | POST | `/api/v1/link` | Paciente resgata um codigo e cria uma solicitacao pendente |
 | POST | `/api/v1/link/{nutricionista_id}/aceitar` | Paciente aceita a solicitacao de vinculo |
 | POST | `/api/v1/link/{nutricionista_id}/recusar` | Paciente recusa a solicitacao de vinculo |
-| GET | `/api/v1/patients?busca=` | Nutricionista lista pacientes ativos com busca opcional por nome |
+| GET | `/api/v1/linking-code/{codigo}/previa` | Nome e CRN de quem gerou um código válido, para o paciente conferir antes de criar a conta (sem login; inválido ou expirado = 404) |
+| GET | `/api/v1/patients?busca=&status=` | Pacientes do nutricionista; `status` = `ativo` (padrão), `pendente` (resgatou o código e não aceitou) ou `todos` |
+| GET | `/api/v1/nutricionista/visao-geral?status=&busca=&pagina=&por_pagina=` | Visão geral da carteira: indicadores (ativos, pendentes, alertas críticos, adesão média, ofensiva média) e monitoramento por paciente (meta, consumo de hoje, adesão semanal, ofensiva, último registro, situação) (🔒 nutricionista) |
 | DELETE | `/api/v1/patients/{paciente_id}` | Nutricionista encerra o vinculo ativo |
 | POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
 | POST | `/api/v1/refeicoes/batch` | Sincroniza em lote as refeições registradas offline no app, sem duplicar reenvios (RNF07) |
@@ -574,23 +598,28 @@ acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
 | POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve ou edita o plano: salva uma versão nova e a torna a ativa (🔒 nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (🔒 nutricionista vinculado ou o próprio paciente) |
 | GET | `/api/v1/pacientes/{paciente_id}/planos/versoes` | Histórico de versões do plano, da mais nova para a mais antiga (RF08, 🔒 nutricionista vinculado) |
+| PUT | `/api/v1/pacientes/{paciente_id}/planos/rascunho` | Salva o rascunho do plano (um por paciente; não vale para o paciente até ser publicado) (🔒 nutricionista vinculado) |
+| GET | `/api/v1/pacientes/{paciente_id}/planos/rascunho` | Rascunho salvo do plano (🔒 nutricionista vinculado) |
+| POST | `/api/v1/pacientes/{paciente_id}/planos/rascunho/publicar` | Prescreve o rascunho como uma versão nova e o apaga (🔒 nutricionista vinculado) |
+| DELETE | `/api/v1/pacientes/{paciente_id}/planos/rascunho` | Descarta o rascunho (🔒 nutricionista vinculado) |
 | GET | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Lista os horários de lembrete de refeição (RF26) |
 | PUT | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Salva os horários de lembrete por refeição (RF26) |
 | PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |
 | GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
 | POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
-| POST | `/api/v1/analises` | Envia a foto do prato para a IA analisar (multipart `file`, 🔒 paciente) |
+| POST | `/api/v1/analises` | Envia a foto do prato para a IA analisar (multipart `file` e, opcional, `tipo_prato` = `raso`/`fundo` como dica para as gramas; 🔒 paciente) |
 | GET | `/api/v1/analises/{id}` | Andamento e resultado da análise: alimentos da TACO com kcal/macros das gramas estimadas (🔒 paciente) |
 | POST | `/api/v1/calculo-nutricional` | Calcula kcal/macros por porção, por id da TACO ou classe da IA (RF03, RF20, RF21) |
-| POST | `/api/v1/amizades` | Envia uma solicitação de amizade para outro paciente (RF05) |
+| POST | `/api/v1/amizades` | Convida outro paciente pelo e-mail exato com que ele se cadastrou (`{"email": ...}`, RF05) |
 | PUT | `/api/v1/amizades/{id}/responder` | Aceita ou recusa convite de amizade recebido (RF05) |
-| GET | `/api/v1/amizades?paciente_id=&status=` | Lista amigos e convites de um paciente (RF05) |
-| DELETE | `/api/v1/amizades/{id}?paciente_id=` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
-| GET | `/api/v1/gamificacao/leaderboard?paciente_id=&limite=` | Leaderboard: Top 10 amigos por ganho de XP na janela semanal (RF05.3, RF29) |
-| GET | `/api/v1/privacidade/ranking-publico?paciente_id=&limite=` | Ranking público LGPD: expõe estritamente nome, avatar, pontos e streak (RF29, RNF07) |
-| GET | `/api/v1/privacidade/desafios/{id}/publico?participantes=` | Desafio público LGPD: expõe estritamente nome, avatar, pontos e streak (RF05.2, RF29) |
-| POST | `/api/v1/gamificacao/xp` | Concede pontos de XP ao paciente e registra histórico (RF05, RF16) |
-| GET | `/api/v1/gamificacao/historico-xp?paciente_id=` | Histórico auditável de XP do paciente (RF16) |
+| GET | `/api/v1/amizades?status=` | Lista amigos e convites do paciente logado (RF05) |
+| DELETE | `/api/v1/amizades/{id}` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
+| GET | `/api/v1/gamificacao/leaderboard?limite=` | Leaderboard: Top 10 amigos do paciente logado por ganho de XP na janela semanal (RF05.3, RF29) |
+| GET | `/api/v1/gamificacao/ranking-publico?limite=` | Ranking semanal dos amigos do paciente logado expondo só nome, avatar, pontos e streak (RF29, RNF07) |
+| GET | `/api/v1/gamificacao/desafios/{id}/publico` | Placar de um desafio (só para quem participa) expondo só nome, avatar, pontos e streak (RF05.2, RF29) |
+| GET | `/api/v1/gamificacao/historico-xp` | Histórico auditável de XP do paciente logado (RF16) |
+| GET | `/api/v1/pacientes/{paciente_id}/perfil` | Perfil: triagem, IMC, TMB, meta diária única (plano ativo, senão triagem), XP, ofensiva e divisão (🔒 o próprio paciente ou nutricionista vinculado) |
+| POST | `/api/v1/pacientes/{paciente_id}/incentivo` | Nutricionista vinculado dá +10 XP de incentivo, uma vez por dia (🔒 nutricionista vinculado) |
 | GET | `/docs` | Swagger UI |
 
 > Os endpoints de vinculação exigem o token do login (`Authorization: Bearer ...`):
@@ -882,11 +911,26 @@ No banco são `numeric(8,2)` e no código `Decimal` — as somas são exatas, se
 de ponto flutuante. **No JSON saem como número** (`193.5`, não `"193.50"`), para
 o app e o painel não precisarem fazer parse de texto em campo numérico.
 
+### Visão geral da carteira
+
+`GET /nutricionista/visao-geral` (painel do nutricionista):
+
+- **adesão semanal**: dos últimos 7 dias locais completos, a porcentagem em que o
+  paciente ficou dentro da meta, com a mesma regra da ofensiva (pelo menos 2
+  refeições e consumo a até 30% da meta);
+- **em risco**: vínculo ativo com alerta de desvio não lido ou sem registro de
+  refeição há 48 h (`motivo_risco` diz qual); entram em `alertas_criticos`;
+- **pendente**: resgatou o código e ainda não aceitou o vínculo. Não traz meta
+  nem consumo, porque o nutricionista ainda não tem acesso aos dados de saúde.
+
 ### Fusos horários
 
 Todos os instantes são gravados e devolvidos em **UTC**, sempre com offset no
-JSON. O agrupamento por dia usa o dia em UTC — a conversão para o fuso do
-paciente fica no app e no painel.
+JSON. O **dia** (histórico, consumo diário, dashboard, alertas, ofensiva), a
+**semana** do ranking e a sugestão do tipo de refeição usam o fuso oficial
+`APP_TIMEZONE` (padrão `America/Sao_Paulo`, ver `app/core/tempo.py`): um jantar
+às 21h30 em São Paulo é gravado como 00h30 UTC do dia seguinte, mas conta no
+próprio dia.
 
 ## Documentação Técnica do Sistema
 

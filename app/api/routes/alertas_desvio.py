@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, status
 
 from app.api.deps import exigir_perfil
+from app.core.tempo import hoje_local
 from app.db.deps import DbSession
 from app.models.usuario import Perfil, Usuario
 from app.schemas.alerta_desvio import (
@@ -15,7 +16,6 @@ from app.schemas.alerta_desvio import (
     RegraAlertaDesvioOut,
 )
 from app.services import alertas_desvio as servico
-from app.services.gamificacao import hoje_local
 
 router = APIRouter(prefix="/alertas-desvio", tags=["alertas-desvio"])
 

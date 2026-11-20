@@ -33,6 +33,12 @@ class RefeicaoPlanoIn(BaseModel):
     horario: time | None = None
     meta_kcal: Decimal = Field(ge=0, le=Decimal("10000"), decimal_places=2)
     meta_proteinas_g: Decimal = Field(ge=0, le=Decimal("1000"), decimal_places=2)
+    meta_carboidratos_g: Decimal | None = Field(
+        default=None, ge=0, le=Decimal("2000"), decimal_places=2
+    )
+    meta_gorduras_g: Decimal | None = Field(
+        default=None, ge=0, le=Decimal("1000"), decimal_places=2
+    )
     observacao: str | None = Field(default=None, max_length=500)
     alimentos: list[AlimentoPlanoIn] = Field(min_length=1, max_length=50)
 
@@ -74,12 +80,14 @@ class RefeicaoPlanoOut(BaseModel):
     horario: time | None
     meta_kcal: Decimal
     meta_proteinas_g: Decimal
+    meta_carboidratos_g: Decimal | None = None
+    meta_gorduras_g: Decimal | None = None
     observacao: str | None
     alimentos: list[AlimentoPlanoOut]
 
-    @field_serializer("meta_kcal", "meta_proteinas_g")
-    def _numerico(self, valor: Decimal) -> float:
-        return float(valor)
+    @field_serializer("meta_kcal", "meta_proteinas_g", "meta_carboidratos_g", "meta_gorduras_g")
+    def _numerico(self, valor: Decimal | None) -> float | None:
+        return None if valor is None else float(valor)
 
 
 class MetasDoPlano(BaseModel):
@@ -87,10 +95,13 @@ class MetasDoPlano(BaseModel):
 
     meta_kcal: Decimal
     meta_proteinas_g: Decimal
+    # Nulos quando nenhum bloco do plano define a meta.
+    meta_carboidratos_g: Decimal | None = None
+    meta_gorduras_g: Decimal | None = None
 
-    @field_serializer("meta_kcal", "meta_proteinas_g")
-    def _numerico(self, valor: Decimal) -> float:
-        return float(valor)
+    @field_serializer("meta_kcal", "meta_proteinas_g", "meta_carboidratos_g", "meta_gorduras_g")
+    def _numerico(self, valor: Decimal | None) -> float | None:
+        return None if valor is None else float(valor)
 
 
 class PlanoAlimentarOut(BaseModel):
@@ -104,6 +115,7 @@ class PlanoAlimentarOut(BaseModel):
     titulo: str
     observacao: str | None
     ativo: bool
+    rascunho: bool = False
     criado_em: datetime
     refeicoes: list[RefeicaoPlanoOut]
     totais: MetasDoPlano

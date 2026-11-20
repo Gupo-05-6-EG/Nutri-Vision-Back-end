@@ -14,22 +14,17 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.tempo import FUSO as FUSO_HORARIO
 from app.models.paciente import Paciente
-from app.models.plano_alimentar import PlanoAlimentar
 from app.models.refeicao import Refeicao
 from app.models.usuario import Usuario
-from app.services.gamificacao import FUSO_HORARIO
+from app.services.metas import meta_kcal_do_paciente
 
 
 def gerar_relatorio(db: Session, paciente_id: int, inicio: date, fim: date) -> bytes:
     paciente = db.get(Paciente, paciente_id)
     usuario = db.get(Usuario, paciente_id)
-    plano = db.scalar(
-        select(PlanoAlimentar).where(
-            PlanoAlimentar.paciente_id == paciente_id, PlanoAlimentar.ativo.is_(True)
-        )
-    )
-    meta = plano.totais["meta_kcal"] if plano else paciente.meta_kcal
+    meta = meta_kcal_do_paciente(db, paciente)
     de = datetime.combine(inicio, time.min, tzinfo=FUSO_HORARIO).astimezone(UTC)
     ate = datetime.combine(fim, time.max, tzinfo=FUSO_HORARIO).astimezone(UTC)
     refeicoes = db.scalars(

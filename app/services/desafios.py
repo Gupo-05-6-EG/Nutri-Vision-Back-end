@@ -3,11 +3,11 @@
 from collections import defaultdict
 from datetime import UTC, date, datetime
 from decimal import Decimal
-from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tempo import FUSO as FUSO_HORARIO
 from app.models.desafio import (
     Desafio,
     ParticipanteDesafio,
@@ -17,9 +17,9 @@ from app.models.desafio import (
 from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.models.usuario import Perfil, Usuario
-
-FUSO_HORARIO = ZoneInfo("America/Sao_Paulo")
-PERCENTUAL_TOLERANCIA_META = Decimal("0.30")
+from app.services import amizades as amizades_servico
+from app.services.gamificacao import cumpriu_meta_do_dia
+from app.services.metas import meta_do_paciente
 
 
 class DesafioNaoEncontrado(Exception):
@@ -34,10 +34,14 @@ class ConviteInvalido(Exception):
     pass
 
 
-def _garantir_pacientes(db: Session, ids: list[int]) -> None:
+def _garantir_pacientes(db: Session, ids: list[int], convidador_id: int) -> None:
     if len(set(ids)) != len(ids):
         raise ConviteInvalido
     if ids and len(db.scalars(select(Paciente.id).where(Paciente.id.in_(ids))).all()) != len(ids):
+        raise ConviteInvalido
+    # So amigos aceitos podem ser convidados: sem isso, qualquer id de paciente
+    # receberia convite (e notificacao) de um desconhecido.
+    if not set(ids) <= set(amizades_servico.obter_ids_amigos_aceitos(db, convidador_id)):
         raise ConviteInvalido
 
 
@@ -51,7 +55,7 @@ def criar_desafio(db: Session, usuario: Usuario, dados) -> Desafio:
     ids = [paciente_id for paciente_id in dados.convidados if paciente_id != usuario.id]
     if len(ids) != len(dados.convidados):
         raise ConviteInvalido
-    _garantir_pacientes(db, ids)
+    _garantir_pacientes(db, ids, usuario.id)
 
     desafio = Desafio(
         criador_id=usuario.id,
@@ -93,7 +97,7 @@ def convidar(
         raise SemPermissaoDesafio
     if usuario.id in ids:
         raise ConviteInvalido
-    _garantir_pacientes(db, ids)
+    _garantir_pacientes(db, ids, usuario.id)
     existentes = (
         set(
             db.scalars(
@@ -201,11 +205,10 @@ def _pontuacoes(db: Session, desafio: Desafio, tipo: str) -> list[tuple[int, str
         refeicoes_por_dia[paciente_id][local.date()].add(refeicao_id)
         tipos_por_dia[paciente_id][local.date()].add(tipo_refeicao)
 
-    metas = dict(
-        db.execute(
-            select(Paciente.id, Paciente.meta_kcal).where(Paciente.id.in_(paciente_ids))
-        ).all()
-    )
+    metas = {
+        paciente.id: meta_do_paciente(db, paciente).kcal
+        for paciente in db.scalars(select(Paciente).where(Paciente.id.in_(paciente_ids)))
+    }
     resultado = []
     inicio_em = desafio.inicio_em
     fim_em = desafio.fim_em
@@ -254,10 +257,8 @@ def _pontuacoes(db: Session, desafio: Desafio, tipo: str) -> list[tuple[int, str
             for offset in range(dias):
                 dia = inicio.fromordinal(inicio.toordinal() + offset)
                 calorias_dia = totais.get(dia, Decimal(0))
-                if (
-                    meta is not None
-                    and len(refeicoes_por_dia[paciente_id][dia]) >= 2
-                    and calorias_dia <= meta * PERCENTUAL_TOLERANCIA_META
+                if cumpriu_meta_do_dia(
+                    meta, len(refeicoes_por_dia[paciente_id][dia]), calorias_dia
                 ):
                     streak += 1
                     melhor = max(melhor, streak)

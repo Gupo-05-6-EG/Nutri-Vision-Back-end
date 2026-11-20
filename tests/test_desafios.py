@@ -3,6 +3,7 @@
 from datetime import UTC, datetime
 from decimal import Decimal
 
+import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -124,6 +125,15 @@ def test_nutricionista_nao_pode_criar_desafio(client: TestClient, db: Session) -
         },
     )
     assert resposta.status_code == 403
+
+
+@pytest.fixture(autouse=True)
+def _todos_sao_amigos(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Aqui se testa a mecanica do desafio; a regra "so amigos" esta em test_desafios_amizade."""
+    monkeypatch.setattr(
+        "app.services.desafios.amizades_servico.obter_ids_amigos_aceitos",
+        lambda _db, _paciente_id: list(range(1, 100)),
+    )
 
 
 def _criar_desafio(
@@ -256,7 +266,8 @@ def test_placar_de_variacao_calorica_ordena_menor_desvio_primeiro(
 def test_placar_de_sequencia_da_meta(client: TestClient, db: Session) -> None:
     primeiro = factories.criar_paciente(db, 1)
     segundo = factories.criar_paciente(db, 2)
-    primeiro.meta_kcal = segundo.meta_kcal = Decimal("2000")
+    # Duas refeicoes de 100 kcal: dentro de 30% de uma meta de 200 kcal
+    primeiro.meta_kcal = segundo.meta_kcal = Decimal("200")
     db.commit()
     desafio_id = _criar_desafio(client, 1, tipo="sequencia_meta", convidados=[2])
     client.post(f"{ROTA}/{desafio_id}/response", headers=_headers(2), json={"aceitar": True})
@@ -270,3 +281,41 @@ def test_placar_de_sequencia_da_meta(client: TestClient, db: Session) -> None:
     assert [p["paciente_id"] for p in participantes] == [1, 2]
     assert participantes[1]["pontuacao"] == 0
     assert {p["unidade"] for p in participantes} == {"dias consecutivos"}
+
+
+def test_unidade_do_placar_de_refeicoes_com_acento(client: TestClient, db: Session) -> None:
+    factories.criar_paciente(db, 1)
+    desafio_id = _criar_desafio(client, 1, tipo="refeicoes")
+
+    placar = client.get(f"{ROTA}/{desafio_id}/leaderboard", headers=_headers(1)).json()
+
+    assert {p["unidade"] for p in placar["participantes"]} == {"dias com todas as refeições"}
+
+
+def test_placar_de_sequencia_usa_a_meta_do_plano(client: TestClient, db: Session) -> None:
+    """Triagem de 2.000 kcal, plano de 200 kcal: 2 x 100 kcal conta o dia (BE-16)."""
+    from app.models.plano_alimentar import PlanoAlimentar, RefeicaoPlano
+
+    primeiro = factories.criar_paciente(db, 1)
+    primeiro.meta_kcal = Decimal("2000")
+    db.add(
+        PlanoAlimentar(
+            paciente_id=1,
+            versao=1,
+            titulo="Plano",
+            ativo=True,
+            refeicoes=[
+                RefeicaoPlano(
+                    ordem=1, nome="Almoco", meta_kcal=Decimal("200"), meta_proteinas_g=Decimal("10")
+                )
+            ],
+        )
+    )
+    db.commit()
+    desafio_id = _criar_desafio(client, 1, tipo="sequencia_meta")
+    for hora, tipo in enumerate(list(TipoRefeicao)[:2], start=8):
+        _criar_refeicao(db, primeiro.id, tipo, hora)
+
+    placar = client.get(f"{ROTA}/{desafio_id}/leaderboard", headers=_headers(1)).json()
+
+    assert placar["participantes"][0]["pontuacao"] == 1

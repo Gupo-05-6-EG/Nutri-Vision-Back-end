@@ -31,6 +31,18 @@ class NutricionistaPublicoOut(BaseModel):
     foto_url: str | None = None
 
 
+class PreviaCodigoOut(BaseModel):
+    """Quem gerou o codigo, mostrado ao paciente antes de criar a conta (prototipo)."""
+
+    nutricionista: NutricionistaPublicoOut
+    crn: str
+    expira_em: datetime
+
+    @field_serializer("expira_em")
+    def _expira_com_fuso(self, valor: datetime) -> datetime:
+        return _com_fuso(valor)
+
+
 class VinculoCriadoOut(BaseModel):
     nutricionista: NutricionistaPublicoOut
     vinculado_em: datetime

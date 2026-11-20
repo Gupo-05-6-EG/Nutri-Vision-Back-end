@@ -1,12 +1,13 @@
 """Testes da categorizacao de refeicoes (RF19)."""
 
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.tempo import FUSO
 from app.models.refeicao import TipoRefeicao
 from app.services.refeicoes import sugerir_tipo
 from tests import factories
@@ -32,8 +33,8 @@ def _criar(client: TestClient, **kwargs: Any) -> dict[str, Any]:
 
 
 def _em(hora: int) -> datetime:
-    """Um horario de ontem (garante que nunca cai no futuro) na hora dada, em UTC."""
-    return (datetime.now(UTC) - timedelta(days=1)).replace(
+    """Um horario de ontem (nunca cai no futuro) na hora dada, no fuso local (B5)."""
+    return (datetime.now(FUSO) - timedelta(days=1)).replace(
         hour=hora, minute=0, second=0, microsecond=0
     )
 

@@ -14,6 +14,8 @@ from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
 from app.services.gamificacao import (
     FUSO_HORARIO,
     XP_POR_DIA,
+    PacienteNaoEncontrado,
+    conceder_xp,
     janela_semanal,
     processar_gamificacao_diaria,
 )
@@ -40,52 +42,53 @@ def paciente_principal(db: Session) -> Paciente:
 
 
 class TestJanelaSemanal:
-    def test_calcula_segunda_a_domingo_utc(self) -> None:
-        # 2026-10-28 é uma quarta-feira
+    def test_calcula_segunda_a_domingo_no_fuso_local(self) -> None:
+        # 2026-10-28 e uma quarta-feira
         quarta = datetime(2026, 10, 28, 14, 30, tzinfo=UTC)
         inicio, fim = janela_semanal(quarta)
 
-        # Segunda-feira: 2026-10-26 00:00:00
-        assert inicio.year == 2026
-        assert inicio.month == 10
-        assert inicio.day == 26
-        assert inicio.hour == 0 and inicio.minute == 0 and inicio.second == 0
+        # Segunda 2026-10-26 00:00 e domingo 2026-11-01 23:59:59 em Sao Paulo
+        assert inicio.astimezone(FUSO_HORARIO) == datetime(2026, 10, 26, tzinfo=FUSO_HORARIO)
+        assert inicio.tzinfo == UTC
+        fim_local = fim.astimezone(FUSO_HORARIO)
+        assert (fim_local.date(), fim_local.hour, fim_local.minute) == (date(2026, 11, 1), 23, 59)
 
-        # Domingo: 2026-11-01 23:59:59
-        assert fim.year == 2026
-        assert fim.month == 11
-        assert fim.day == 1
-        assert fim.hour == 23 and fim.minute == 59 and fim.second == 59
+    def test_domingo_a_noite_ainda_e_a_mesma_semana(self) -> None:
+        # Domingo 22h em Sao Paulo ja e segunda em UTC (B5)
+        domingo = datetime(2026, 11, 1, 22, 0, tzinfo=FUSO_HORARIO)
+        inicio, _ = janela_semanal(domingo)
+        assert inicio.astimezone(FUSO_HORARIO).date() == date(2026, 10, 26)
 
 
 class TestConcessaoXP:
-    def test_concede_xp_e_acumula_saldo(
-        self, client: TestClient, db: Session, paciente_principal: Paciente
-    ) -> None:
-        resposta = client.post(
-            "/api/v1/gamificacao/xp",
-            json={
-                "paciente_id": paciente_principal.id,
-                "quantidade": 50,
-                "motivo": "meta_diaria",
-            },
-        )
-        assert resposta.status_code == 201
-        dados = resposta.json()
-        assert dados["quantidade"] == 50
-        assert dados["motivo"] == "meta_diaria"
+    def test_concede_xp_e_acumula_saldo(self, db: Session, paciente_principal: Paciente) -> None:
+        registro = conceder_xp(db, paciente_principal.id, 50, "meta_diaria")
 
+        assert registro.quantidade == 50
+        assert registro.motivo == "meta_diaria"
         db.expire_all()
         paciente_atualizado = db.get(Paciente, paciente_principal.id)
         assert paciente_atualizado is not None
         assert paciente_atualizado.xp == 50
 
-    def test_paciente_inexistente_retorna_404(self, client: TestClient) -> None:
-        resposta = client.post(
-            "/api/v1/gamificacao/xp",
-            json={"paciente_id": 9999, "quantidade": 50, "motivo": "teste"},
+    def test_paciente_inexistente(self, db: Session) -> None:
+        with pytest.raises(PacienteNaoEncontrado):
+            conceder_xp(db, 9999, 50, "teste")
+
+    def test_historico_e_do_paciente_autenticado(
+        self, client: TestClient, db: Session, paciente_principal: Paciente
+    ) -> None:
+        outro = _criar_paciente_social(db, 20, "outro")
+        conceder_xp(db, paciente_principal.id, 30, "refeicao")
+        conceder_xp(db, outro.id, 99, "refeicao")
+
+        resposta = client.get(
+            "/api/v1/gamificacao/historico-xp?paciente_id=20",
+            headers=factories.headers_de(paciente_principal.id),
         )
-        assert resposta.status_code == 404
+
+        assert resposta.status_code == 200
+        assert [r["quantidade"] for r in resposta.json()] == [30]
 
 
 class TestLeaderboardSemanal:
@@ -93,7 +96,7 @@ class TestLeaderboardSemanal:
         self, client: TestClient, paciente_principal: Paciente
     ) -> None:
         resposta = client.get(
-            f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}"
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
         )
         assert resposta.status_code == 200
         dados = resposta.json()
@@ -183,7 +186,9 @@ class TestLeaderboardSemanal:
         )
         db.commit()
 
-        resp = client.get(f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}")
+        resp = client.get(
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
+        )
         assert resp.status_code == 200
         dados = resp.json()
         assert dados["total_participantes"] == 4
@@ -247,7 +252,9 @@ class TestLeaderboardSemanal:
         )
         db.commit()
 
-        resp = client.get(f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}")
+        resp = client.get(
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
+        )
         assert resp.status_code == 200
         dados = resp.json()
         # Apenas paciente_principal deve estar no ranking
@@ -278,7 +285,9 @@ class TestLeaderboardSemanal:
             )
         db.commit()
 
-        resp = client.get(f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}")
+        resp = client.get(
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
+        )
         assert resp.status_code == 200
         dados = resp.json()
         assert dados["total_participantes"] == 16  # 15 amigos + 1 principal
@@ -288,7 +297,9 @@ class TestLeaderboardSemanal:
         self, client: TestClient, db: Session, paciente_principal: Paciente
     ) -> None:
         """RF-29: O placar deve restringir exposicao a dados nao sensiveis (pontos, streak)."""
-        resp = client.get(f"/api/v1/gamificacao/leaderboard?paciente_id={paciente_principal.id}")
+        resp = client.get(
+            "/api/v1/gamificacao/leaderboard", headers=factories.headers_de(paciente_principal.id)
+        )
         assert resp.status_code == 200
         item = resp.json()["ranking"][0]
 
@@ -297,6 +308,7 @@ class TestLeaderboardSemanal:
             "posicao",
             "paciente_id",
             "username",
+            "nome",
             "xp_semanal",
             "streak",
             "e_voce",
@@ -340,8 +352,8 @@ def _refeicao(db: Session, paciente_id: int, hora: int, kcal: str, dia: date = D
 
 def test_dia_valido_soma_streak_e_xp(db: Session) -> None:
     paciente = _paciente(db)
-    _refeicao(db, 1, 8, "200")
-    _refeicao(db, 1, 12, "300")  # 500 kcal <= 30% de 2000
+    _refeicao(db, 1, 8, "900")
+    _refeicao(db, 1, 12, "1000")  # 1900 kcal: dentro de 30% da meta de 2000
 
     assert processar_gamificacao_diaria(db, DIA) == 1
 
@@ -366,12 +378,36 @@ def test_acima_do_limite_da_meta_zera_streak(db: Session) -> None:
     paciente = _paciente(db)
     paciente.streak = 2
     db.commit()
-    _refeicao(db, 1, 8, "400")
-    _refeicao(db, 1, 12, "300")  # 700 kcal > 600
+    _refeicao(db, 1, 8, "1500")
+    _refeicao(db, 1, 12, "1300")  # 2800 kcal > 2600 (meta + 30%)
 
     processar_gamificacao_diaria(db, DIA)
 
     assert paciente.streak == 0
+
+
+def test_abaixo_do_limite_da_meta_zera_streak(db: Session) -> None:
+    """Comer muito menos que a meta tambem nao e dia dentro da meta."""
+    paciente = _paciente(db)
+    paciente.streak = 2
+    db.commit()
+    _refeicao(db, 1, 8, "200")
+    _refeicao(db, 1, 12, "300")  # 500 kcal < 1400 (meta - 30%)
+
+    processar_gamificacao_diaria(db, DIA)
+
+    assert paciente.streak == 0
+
+
+def test_dia_valido_grava_historico_de_xp(db: Session) -> None:
+    paciente = _paciente(db)
+    _refeicao(db, 1, 8, "1000")
+    _refeicao(db, 1, 12, "1000")
+
+    processar_gamificacao_diaria(db, DIA)
+
+    historico = db.query(HistoricoXP).filter_by(paciente_id=paciente.id).all()
+    assert [(h.quantidade, h.motivo) for h in historico] == [(XP_POR_DIA, f"meta_diaria:{DIA}")]
 
 
 def test_paciente_sem_meta_nao_cumpre(db: Session) -> None:
@@ -388,8 +424,8 @@ def test_paciente_sem_meta_nao_cumpre(db: Session) -> None:
 def test_considera_o_dia_no_fuso_de_sao_paulo(db: Session) -> None:
     paciente = _paciente(db)
     # 22h em Sao Paulo ja e o dia seguinte em UTC, mas conta para DIA.
-    _refeicao(db, 1, 21, "100")
-    _refeicao(db, 1, 22, "100")
+    _refeicao(db, 1, 21, "1000")
+    _refeicao(db, 1, 22, "1000")
 
     processar_gamificacao_diaria(db, DIA)
 
@@ -398,8 +434,8 @@ def test_considera_o_dia_no_fuso_de_sao_paulo(db: Session) -> None:
 
 def test_rodar_duas_vezes_no_mesmo_dia_nao_credita_de_novo(db: Session) -> None:
     paciente = _paciente(db)
-    _refeicao(db, 1, 8, "100")
-    _refeicao(db, 1, 12, "100")
+    _refeicao(db, 1, 8, "1000")
+    _refeicao(db, 1, 12, "1000")
 
     processar_gamificacao_diaria(db, DIA)
     assert processar_gamificacao_diaria(db, DIA) == 0
@@ -430,8 +466,8 @@ def test_dia_valido_nao_consume_bloqueio(db: Session) -> None:
     paciente = _paciente(db)
     paciente.streak, paciente.bloqueios_perda = 2, 1
     db.commit()
-    _refeicao(db, 1, 8, "100")
-    _refeicao(db, 1, 12, "100")
+    _refeicao(db, 1, 8, "1000")
+    _refeicao(db, 1, 12, "1000")
 
     processar_gamificacao_diaria(db, DIA)
 

@@ -73,7 +73,7 @@ def criar_paciente(db: Session, paciente_id: int) -> Paciente:
         )
     )
     db.flush()
-    paciente = Paciente(id=paciente_id)
+    paciente = Paciente(id=paciente_id, nome=f"Paciente {paciente_id}")
     db.add(paciente)
     db.commit()
     return paciente

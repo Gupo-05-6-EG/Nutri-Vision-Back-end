@@ -4,6 +4,7 @@ from sqlalchemy import func, literal, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.texto import palavras_da_busca
 from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.alimento_taco import AlimentoTaco
 from app.schemas.alimento_personalizado import (
@@ -52,7 +53,7 @@ def buscar_alimentos(
     so aparece para o paciente que o cadastrou. Ordem alfabetica, com paginacao
     aplicada sobre a uniao das duas tabelas.
     """
-    padrao = f"%{nome.strip()}%"
+    palavras = palavras_da_busca(nome)
 
     taco = select(
         literal(OrigemAlimento.TACO.value).label("origem"),
@@ -63,7 +64,7 @@ def buscar_alimentos(
         AlimentoTaco.carbs_100g.label("carbs_100g"),
         AlimentoTaco.prot_100g.label("prot_100g"),
         AlimentoTaco.gord_100g.label("gord_100g"),
-    ).where(AlimentoTaco.nome.ilike(padrao))
+    ).where(*(AlimentoTaco.nome_normalizado.contains(p, autoescape=True) for p in palavras))
 
     fontes = [taco]
     if paciente_id is not None:
@@ -79,7 +80,10 @@ def buscar_alimentos(
                 AlimentoPersonalizado.gord_100g.label("gord_100g"),
             ).where(
                 AlimentoPersonalizado.paciente_id == paciente_id,
-                AlimentoPersonalizado.nome.ilike(padrao),
+                *(
+                    AlimentoPersonalizado.nome_normalizado.contains(p, autoescape=True)
+                    for p in palavras
+                ),
             )
         )
 

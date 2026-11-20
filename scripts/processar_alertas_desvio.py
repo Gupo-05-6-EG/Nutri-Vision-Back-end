@@ -1,8 +1,8 @@
 """Executa o job diario de alertas de desvio de meta (Task 5.4, RF10.2)."""
 
+from app.core.tempo import hoje_local
 from app.db.session import SessionLocal
 from app.services.alertas_desvio import processar_alertas_desvio_diario
-from app.services.gamificacao import hoje_local
 
 
 def main() -> None:

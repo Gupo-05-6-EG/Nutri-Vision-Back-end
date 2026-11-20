@@ -25,6 +25,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
+from app.core.tempo import FUSO
 from app.models.alimento_taco import AlimentoTaco
 from app.models.paciente import Genero, NivelAtividade
 from app.schemas.calculo_nutricional import ItemCalculoIn, MetodoPreparo
@@ -88,8 +89,10 @@ class TestRefeicaoFusoHorario:
         assert resposta.json()["consumida_em"].startswith("2026-01-10T12:30:00")
         assert resposta.json()["consumida_em"].endswith(("Z", "+00:00"))
 
-    def test_horario_com_offset_e_convertido_para_utc(self, client: TestClient) -> None:
-        """21h em Brasilia (-03:00) ja e o dia seguinte em UTC."""
+    def test_horario_com_offset_e_gravado_em_utc_mas_conta_no_dia_local(
+        self, client: TestClient
+    ) -> None:
+        """21h em Brasilia (-03:00) e gravado como 00h UTC, mas e do dia 10 (B5)."""
         refeicao = client.post(
             ROTA_REFEICOES,
             json={**factories.refeicao(), "consumida_em": "2026-01-10T21:00:00-03:00"},
@@ -104,16 +107,16 @@ class TestRefeicaoFusoHorario:
             f"{ROTA_REFEICOES}/consumo-diario",
             params={"paciente_id": PACIENTE, "data": "2026-01-10"},
         ).json()
-        assert dia_11["quantidade_refeicoes"] == 1
-        assert dia_10["quantidade_refeicoes"] == 0
+        assert dia_10["quantidade_refeicoes"] == 1
+        assert dia_11["quantidade_refeicoes"] == 0
 
-    def test_tipo_sugerido_usa_a_hora_em_utc(self, client: TestClient) -> None:
-        """09h em -03:00 = 12h UTC: cai na janela do almoco (regra atual da API)."""
+    def test_tipo_sugerido_usa_a_hora_local(self, client: TestClient) -> None:
+        """09h em -03:00 e cafe da manha, mesmo sendo 12h em UTC (B5)."""
         refeicao = client.post(
             ROTA_REFEICOES,
             json={**factories.refeicao(), "consumida_em": "2026-01-10T09:00:00-03:00"},
         ).json()
-        assert refeicao["tipo"] == "almoco"
+        assert refeicao["tipo"] == "cafe_da_manha"
 
     def test_aceita_ate_um_minuto_no_futuro(self, client: TestClient) -> None:
         """Folga para relogio de celular levemente adiantado."""
@@ -483,7 +486,7 @@ class TestIntegracaoComTacoReal:
         }
 
         # 3. O app confirma e registra a refeicao com os valores calculados
-        consumida_em = datetime.combine(date(2026, 1, 10), datetime.min.time(), tzinfo=UTC)
+        consumida_em = datetime.combine(date(2026, 1, 10), datetime.min.time(), tzinfo=FUSO)
         itens = [
             {
                 "nome_alimento": linha["alimento_taco"],

@@ -2,22 +2,24 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.amizade import StatusAmizade
 
 
 class SolicitacaoAmizadeCreate(BaseModel):
-    """Payload para enviar uma nova solicitacao de amizade."""
+    """Convite pelo e-mail exato do amigo (o solicitante vem do token).
 
-    paciente_id: int = Field(gt=0, description="Id do paciente solicitante")
-    amigo_id: int = Field(gt=0, description="Id do paciente convidado")
+    Pelo e-mail, e nao pelo id: o paciente nao precisa conhecer ids internos, e a
+    API nao expoe uma lista de usuarios para busca.
+    """
+
+    email: EmailStr = Field(description="E-mail com que o amigo se cadastrou")
 
 
 class RespostaSolicitacao(BaseModel):
-    """Payload para aceitar ou recusar uma solicitacao de amizade."""
+    """Payload para aceitar ou recusar uma solicitacao (quem responde vem do token)."""
 
-    paciente_id: int = Field(gt=0, description="Id do paciente que responde (deve ser o convidado)")
     aceitar: bool = Field(description="True para aceitar o convite, False para recusar")
 
 
@@ -38,8 +40,10 @@ class AmigoItem(BaseModel):
 
     id: int = Field(description="Id da amizade")
     paciente_id: int = Field(description="Id do outro paciente")
+    nome: str | None = Field(default=None, description="Nome do outro paciente")
     username: str | None = Field(default=None, description="Nome de usuario publico")
     streak: int = Field(default=0, description="Dias consecutivos de ofensiva")
+    xp: int = Field(default=0, description="XP total do outro paciente")
     status: StatusAmizade
     sou_solicitante: bool = Field(
         description="True se o paciente solicitou o convite, False se recebeu"

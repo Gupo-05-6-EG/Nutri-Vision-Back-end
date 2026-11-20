@@ -17,6 +17,7 @@ from pydantic import ValidationError
 from sqlalchemy.orm import Session
 
 from app.models.amizade import Amizade, StatusAmizade
+from app.models.desafio import Desafio, ParticipanteDesafio, StatusParticipante
 from app.models.historico_xp import HistoricoXP
 from app.models.paciente import Paciente
 from app.models.refeicao import ItemRefeicao, Refeicao, TipoRefeicao
@@ -114,6 +115,30 @@ def amigo_terceiro(db: Session, paciente_com_dados_clinicos: Paciente) -> Pacien
     return amigo
 
 
+def _desafio(db: Session, criador: Paciente, convidados_aceitos: list[Paciente]) -> Desafio:
+    agora = datetime.now(UTC)
+    desafio = Desafio(
+        criador_id=criador.id,
+        nome="Desafio 7 Dias",
+        tipo="refeicoes",
+        regra="Registrar todas as refeicoes",
+        inicio_em=agora - timedelta(days=1),
+        fim_em=agora + timedelta(days=6),
+    )
+    db.add(desafio)
+    db.flush()
+    for paciente in [criador, *convidados_aceitos]:
+        db.add(
+            ParticipanteDesafio(
+                desafio_id=desafio.id,
+                paciente_id=paciente.id,
+                status=StatusParticipante.ACEITO.value,
+            )
+        )
+    db.commit()
+    return desafio
+
+
 class TestDTOsPublicosLGPD:
     """Valida o contrato restrito dos DTOs publicos (Item 51 - RF29)."""
 
@@ -196,7 +221,10 @@ class TestConformidadePrivacidadeEndpoints:
         amigo_terceiro: Paciente,
     ) -> None:
         """Ao consultar o ranking publico, o terceiro nao pode ter acesso a dados de saude."""
-        resp = client.get(f"/api/v1/privacidade/ranking-publico?paciente_id={amigo_terceiro.id}")
+        resp = client.get(
+            "/api/v1/gamificacao/ranking-publico",
+            headers=factories.headers_de(amigo_terceiro.id),
+        )
         assert resp.status_code == 200
         dados = resp.json()
 
@@ -204,12 +232,12 @@ class TestConformidadePrivacidadeEndpoints:
         assert dados["total_participantes"] >= 2
 
         # Encontra o registro correspondente ao paciente com dados clinicos
-        item_lucas = next((it for it in dados["ranking"] if it["nome"] == "Lucas Silva"), None)
+        item_lucas = next((it for it in dados["ranking"] if it["nome"] == "Lucas S."), None)
         assert item_lucas is not None
 
         # Verifica campos autorizados
         assert set(item_lucas.keys()) == {"nome", "avatar", "pontos", "streak"}
-        assert item_lucas["nome"] == "Lucas Silva"
+        assert item_lucas["nome"] == "Lucas S."
         assert item_lucas["avatar"] == "https://cdn.nutrivision.app/avatars/lucas.png"
         assert item_lucas["pontos"] == 100
         assert item_lucas["streak"] == 12
@@ -238,60 +266,64 @@ class TestConformidadePrivacidadeEndpoints:
         for campo in campos_proibidos:
             assert campo not in item_lucas, f"Campo sensivel '{campo}' vazou no ranking publico!"
 
-    def test_ranking_publico_via_gamificacao_router_tem_mesma_protecao(
-        self,
-        client: TestClient,
-        amigo_terceiro: Paciente,
+    def test_rotas_publicas_exigem_login_e_nao_tem_mais_duplicata(
+        self, client: TestClient, amigo_terceiro: Paciente
     ) -> None:
-        """Alias /api/v1/gamificacao/ranking-publico segue a mesma conformidade LGPD."""
-        resp = client.get(f"/api/v1/gamificacao/ranking-publico?paciente_id={amigo_terceiro.id}")
-        assert resp.status_code == 200
-        item = resp.json()["ranking"][0]
-        assert set(item.keys()) == {"nome", "avatar", "pontos", "streak"}
-        assert "calorias" not in item
-        assert "peso_kg" not in item
-        assert "refeicoes" not in item
+        """Antes respondiam sem token e existiam em dois prefixos (B2)."""
+        assert client.get("/api/v1/gamificacao/ranking-publico").status_code == 401
+        assert client.get("/api/v1/gamificacao/desafios/1/publico").status_code == 401
+        headers = factories.headers_de(amigo_terceiro.id)
+        assert client.get("/api/v1/privacidade/ranking-publico", headers=headers).status_code == 404
+        assert (
+            client.get("/api/v1/privacidade/desafios/1/publico", headers=headers).status_code == 404
+        )
 
     def test_desafio_publico_nao_retorna_calorias_peso_nem_refeicoes(
         self,
         client: TestClient,
+        db: Session,
         paciente_com_dados_clinicos: Paciente,
         amigo_terceiro: Paciente,
     ) -> None:
-        """Placar publico de desafios em grupo nao expoem calorias, peso nem refeicoes."""
-        pids = f"{paciente_com_dados_clinicos.id},{amigo_terceiro.id}"
+        """Placar de desafio: titulo e participantes vem do desafio cadastrado."""
+        desafio = _desafio(db, paciente_com_dados_clinicos, [amigo_terceiro])
         resp = client.get(
-            f"/api/v1/privacidade/desafios/10/publico?participantes={pids}&titulo=Desafio 7 Dias"
+            f"/api/v1/gamificacao/desafios/{desafio.id}/publico?participantes=1,2,3&titulo=X",
+            headers=factories.headers_de(amigo_terceiro.id),
         )
         assert resp.status_code == 200
         dados = resp.json()
 
-        assert dados["desafio_id"] == 10
+        assert dados["desafio_id"] == desafio.id
         assert dados["titulo"] == "Desafio 7 Dias"
         assert dados["total_participantes"] == 2
+        assert {p["nome"] for p in dados["participantes"]} == {"Lucas S.", "Camila S."}
 
         for part in dados["participantes"]:
             assert set(part.keys()) == {"nome", "avatar", "pontos", "streak"}
             assert "peso_kg" not in part
             assert "calorias" not in part
-            assert "calorias_kcal" not in part
             assert "meta_kcal" not in part
-            assert "refeicoes" not in part
 
-    def test_desafio_publico_via_gamificacao_router_tem_mesma_protecao(
+    def test_desafio_publico_so_para_participantes(
         self,
         client: TestClient,
+        db: Session,
         paciente_com_dados_clinicos: Paciente,
+        amigo_terceiro: Paciente,
     ) -> None:
-        """Alias /api/v1/gamificacao/desafios/{id}/publico preserva LGPD."""
-        resp = client.get(
-            f"/api/v1/gamificacao/desafios/5/publico?participantes={paciente_com_dados_clinicos.id}"
-        )
+        desafio = _desafio(db, paciente_com_dados_clinicos, [])
+        url = f"/api/v1/gamificacao/desafios/{desafio.id}/publico"
+
+        resp = client.get(url, headers=factories.headers_de(amigo_terceiro.id))
+        assert resp.status_code == 404
+        resp = client.get(url, headers=factories.headers_de(paciente_com_dados_clinicos.id))
         assert resp.status_code == 200
-        item = resp.json()["participantes"][0]
-        assert set(item.keys()) == {"nome", "avatar", "pontos", "streak"}
-        assert "calorias" not in item
-        assert "peso" not in item
+        resp = client.get(
+            "/api/v1/gamificacao/desafios/999/publico",
+            headers=factories.headers_de(amigo_terceiro.id),
+        )
+        assert resp.status_code == 404
 
     def test_terceiros_nao_recebem_refeicoes_de_outros_usuarios(
         self,
@@ -320,7 +352,7 @@ class TestConformidadePrivacidadeEndpoints:
         amigo_terceiro: Paciente,
     ) -> None:
         """Endpoint de amizades expoe dados sociais e exclui metricas clinicas."""
-        resp = client.get(f"/api/v1/amizades?paciente_id={amigo_terceiro.id}")
+        resp = client.get("/api/v1/amizades", headers=factories.headers_de(amigo_terceiro.id))
         assert resp.status_code == 200
         amigos = resp.json()
         assert len(amigos) == 1

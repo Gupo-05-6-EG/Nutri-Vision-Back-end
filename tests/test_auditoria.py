@@ -28,7 +28,7 @@ PREFIXO_FERNET = "gAAAA"
 def _usuarios(db: Session) -> None:
     factories.criar_nutricionista(db, NUTRI)
     factories.criar_paciente(db, PACIENTE)
-    db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=PACIENTE))
+    db.add(Vinculo(nutricionista_id=NUTRI, paciente_id=PACIENTE, status="ativo"))
     db.commit()
 
 

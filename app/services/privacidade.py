@@ -9,16 +9,28 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models.alimento_personalizado import AlimentoPersonalizado
 from app.models.consentimento import Consentimento
+from app.models.desafio import Desafio, ParticipanteDesafio, StatusParticipante
+from app.models.historico_xp import HistoricoXP
 from app.models.paciente import Paciente
 from app.models.refeicao import Refeicao
 from app.models.usuario import Perfil, Usuario
 from app.models.vinculo import Vinculo
+from app.schemas.alimento_personalizado import AlimentoPersonalizadoOut
+from app.schemas.exportacao import (
+    ExportacaoDadosOut,
+    HistoricoXPExportado,
+    PacienteExportado,
+    UsuarioExportado,
+    VinculoExportado,
+)
 from app.schemas.privacidade import (
+    ConsentimentoOut,
     DesafioPublicoItem,
     DesafioPublicoOut,
     RankingPublicoItem,
     RankingPublicoOut,
 )
+from app.schemas.refeicao import RefeicaoOut
 from app.services import amizades as amizades_servico
 from app.services import gamificacao as gamificacao_servico
 
@@ -82,40 +94,54 @@ def revogar_consentimento(db: Session, usuario_id: int) -> Consentimento | None:
     return consentimento
 
 
-def exportar_dados(db: Session, usuario: Usuario) -> dict[str, object]:
-    consentimentos = listar_consentimentos(db, usuario.id)
-    dados: dict[str, object] = {
-        "usuario": {
-            "id": usuario.id,
-            "nome": usuario.nome,
-            "email": usuario.email,
-            "perfil": usuario.perfil,
-            "criado_em": usuario.criado_em,
-        },
-        "consentimentos": consentimentos,
-    }
+def exportar_dados(db: Session, usuario: Usuario) -> ExportacaoDadosOut:
+    """Monta a exportacao do titular com schemas (nada de objeto do banco na resposta)."""
+    consentimentos = [
+        ConsentimentoOut(
+            versao_termo=c.versao_termo, aceito_em=c.aceito_em, revogado_em=c.revogado_em
+        )
+        for c in listar_consentimentos(db, usuario.id)
+    ]
+    dados = ExportacaoDadosOut(
+        gerado_em=datetime.now(UTC),
+        usuario=UsuarioExportado.model_validate(usuario),
+        consentimentos=consentimentos,
+        vinculos=[],
+    )
     if usuario.perfil == Perfil.PACIENTE:
         paciente = db.get(Paciente, usuario.id)
-        dados["paciente"] = paciente
+        if paciente is not None:
+            dados.paciente = PacienteExportado.model_validate(paciente)
         refeicoes = db.scalars(
             select(Refeicao)
             .where(Refeicao.paciente_id == usuario.id)
             .options(selectinload(Refeicao.itens))
             .order_by(Refeicao.consumida_em, Refeicao.id)
         ).all()
-        dados["refeicoes"] = refeicoes
-        dados["alimentos_personalizados"] = db.scalars(
-            select(AlimentoPersonalizado)
-            .where(AlimentoPersonalizado.paciente_id == usuario.id)
-            .order_by(AlimentoPersonalizado.id)
-        ).all()
-        dados["vinculos"] = db.scalars(
-            select(Vinculo).where(Vinculo.paciente_id == usuario.id).order_by(Vinculo.id)
-        ).all()
+        dados.refeicoes = [RefeicaoOut.model_validate(r) for r in refeicoes]
+        dados.alimentos_personalizados = [
+            AlimentoPersonalizadoOut.model_validate(a)
+            for a in db.scalars(
+                select(AlimentoPersonalizado)
+                .where(AlimentoPersonalizado.paciente_id == usuario.id)
+                .order_by(AlimentoPersonalizado.id)
+            )
+        ]
+        dados.historico_xp = [
+            HistoricoXPExportado.model_validate(h)
+            for h in db.scalars(
+                select(HistoricoXP)
+                .where(HistoricoXP.paciente_id == usuario.id)
+                .order_by(HistoricoXP.criado_em, HistoricoXP.id)
+            )
+        ]
+        filtro_vinculo = Vinculo.paciente_id == usuario.id
     else:
-        dados["vinculos"] = db.scalars(
-            select(Vinculo).where(Vinculo.nutricionista_id == usuario.id).order_by(Vinculo.id)
-        ).all()
+        filtro_vinculo = Vinculo.nutricionista_id == usuario.id
+    dados.vinculos = [
+        VinculoExportado.model_validate(v)
+        for v in db.scalars(select(Vinculo).where(filtro_vinculo).order_by(Vinculo.id))
+    ]
     return dados
 
 
@@ -161,9 +187,7 @@ def obter_ranking_publico(
     candidatos = []
     for pid in participantes_ids:
         paciente = pacientes.get(pid)
-        nome = (paciente.nome if paciente and paciente.nome else None) or (
-            paciente.username if paciente else None
-        )
+        nome = _nome_publico(paciente)
         avatar = paciente.avatar if paciente else None
         pontos = totais_xp.get(pid, 0)
         streak = paciente.streak if paciente else 0
@@ -191,57 +215,58 @@ def obter_ranking_publico(
     )
 
 
-def obter_desafio_publico(
-    db: Session,
-    desafio_id: int,
-    titulo: str = "Desafio Semanal de Adesao ao Plano",
-    participante_ids: list[int] | None = None,
-) -> DesafioPublicoOut:
-    """Gera o placar de desafio expondo APENAS nome, avatar, pontos e streak (RF05.2, RF29).
+class DesafioNaoEncontrado(Exception):
+    """Desafio inexistente ou o solicitante nao participa dele."""
 
-    Participantes competem sem ter seus dados clinicos (calorias consumidas, refeicoes
-    individuais ou peso) revelados aos demais concorrentes.
+
+def obter_desafio_publico(db: Session, desafio_id: int, solicitante_id: int) -> DesafioPublicoOut:
+    """Placar do desafio expondo APENAS nome, avatar, pontos e streak (RF05.2, RF29).
+
+    O titulo e os participantes (convites aceitos) vem do desafio cadastrado. So
+    quem participa (ou criou) enxerga o placar; para os demais o desafio "nao existe".
     """
-    ids = participante_ids or []
-    if not ids:
-        return DesafioPublicoOut(
-            desafio_id=desafio_id,
-            titulo=titulo,
-            total_participantes=0,
-            participantes=[],
+    desafio = db.get(Desafio, desafio_id)
+    if desafio is None:
+        raise DesafioNaoEncontrado
+    ids = list(
+        db.scalars(
+            select(ParticipanteDesafio.paciente_id)
+            .where(
+                ParticipanteDesafio.desafio_id == desafio_id,
+                ParticipanteDesafio.status == StatusParticipante.ACEITO.value,
+            )
+            .order_by(ParticipanteDesafio.paciente_id)
         )
+    )
+    if solicitante_id not in ids and solicitante_id != desafio.criador_id:
+        raise DesafioNaoEncontrado
 
-    pacientes_consulta = select(Paciente).where(Paciente.id.in_(ids))
-    pacientes = {p.id: p for p in db.scalars(pacientes_consulta).all()}
-
+    pacientes = {p.id: p for p in db.scalars(select(Paciente).where(Paciente.id.in_(ids)))}
     inicio, fim = gamificacao_servico.janela_semanal()
     totais_xp = gamificacao_servico.calcular_xp_semanal(db, ids, inicio, fim)
 
     participantes = []
     for pid in ids:
         paciente = pacientes.get(pid)
-        nome = (paciente.nome if paciente and paciente.nome else None) or (
-            paciente.username if paciente else None
-        )
-        avatar = paciente.avatar if paciente else None
-        pontos = totais_xp.get(pid, 0)
-        streak = paciente.streak if paciente else 0
-
         participantes.append(
             DesafioPublicoItem(
-                nome=nome,
-                avatar=avatar,
-                pontos=pontos,
-                streak=streak,
+                nome=_nome_publico(paciente),
+                avatar=paciente.avatar if paciente else None,
+                pontos=totais_xp.get(pid, 0),
+                streak=paciente.streak if paciente else 0,
             )
         )
-
-    # Ordenacao por pontuacao e streak
     participantes.sort(key=lambda p: (-p.pontos, -p.streak))
 
     return DesafioPublicoOut(
         desafio_id=desafio_id,
-        titulo=titulo,
+        titulo=desafio.nome,
         total_participantes=len(participantes),
         participantes=participantes,
     )
+
+
+def _nome_publico(paciente: Paciente | None) -> str | None:
+    if paciente is None:
+        return None
+    return gamificacao_servico.nome_social(paciente.nome) or paciente.username

@@ -14,7 +14,7 @@ def test_pdf_restrito_ao_nutricionista_vinculado(client: TestClient, db: Session
     factories.criar_paciente(db, 1)
     factories.criar_nutricionista(db, 10)
     factories.criar_nutricionista(db, 11)
-    db.add(Vinculo(nutricionista_id=10, paciente_id=1))
+    db.add(Vinculo(nutricionista_id=10, paciente_id=1, status="ativo"))
     db.commit()
     assert client.get(URL, params=PERIODO).status_code == 401
     assert client.get(URL, params=PERIODO, headers=factories.headers_de(1)).status_code == 403
@@ -34,7 +34,7 @@ def test_relatorio_com_consumo_e_meta(client: TestClient, db: Session) -> None:
     paciente = factories.criar_paciente(db, 1)
     factories.criar_nutricionista(db, 10)
     paciente.meta_kcal = 2000
-    db.add(Vinculo(nutricionista_id=10, paciente_id=1))
+    db.add(Vinculo(nutricionista_id=10, paciente_id=1, status="ativo"))
     db.commit()
     dados = factories.refeicao(paciente_id=1, consumida_em=datetime(2026, 11, 7, 15, tzinfo=UTC))
     assert (

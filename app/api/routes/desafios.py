@@ -97,7 +97,8 @@ def obter_placar(desafio_id: int, db: DbSession, usuario: UsuarioAtual) -> Placa
     except (servico.DesafioNaoEncontrado, servico.SemPermissaoDesafio) as erro:
         _http_error(erro)
     unidade = {
-        "refeicoes": "refeicoes",
+        # A pontuacao conta os dias com as quatro refeicoes registradas (B7).
+        "refeicoes": "dias com todas as refeições",
         "variacao_calorica": "kcal/dia (menor vence)",
         "sequencia_meta": "dias consecutivos",
     }[tipo]

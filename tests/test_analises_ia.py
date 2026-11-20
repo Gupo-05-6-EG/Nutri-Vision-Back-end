@@ -79,6 +79,29 @@ def _item(food: str, grams: float, confidence: float = 0.95, **extra: Any) -> di
 
 
 class TestEnvioDaFoto:
+    def test_repassa_o_tipo_de_prato_como_dica(self, client: TestClient, ia: IAFalsa) -> None:
+        ia.responde(202, {"id": ID, "status": "QUEUED"})
+
+        resposta = client.post(ROTA, files=FOTO, data={"tipo_prato": "fundo"})
+
+        assert resposta.status_code == 202, resposta.text
+        corpo = ia.requisicoes[0].read()
+        assert b'name="plate_type"' in corpo
+        assert b"deep" in corpo
+
+    def test_sem_tipo_de_prato_nao_manda_dica(self, client: TestClient, ia: IAFalsa) -> None:
+        ia.responde(202, {"id": ID, "status": "QUEUED"})
+
+        client.post(ROTA, files=FOTO)
+
+        assert b"plate_type" not in ia.requisicoes[0].read()
+
+    def test_tipo_de_prato_invalido(self, client: TestClient, ia: IAFalsa) -> None:
+        resposta = client.post(ROTA, files=FOTO, data={"tipo_prato": "travessa"})
+
+        assert resposta.status_code == 422
+        assert ia.requisicoes == []
+
     def test_repassa_a_foto_e_devolve_o_id(self, client: TestClient, ia: IAFalsa) -> None:
         ia.responde(202, {"id": ID, "status": "QUEUED"})
 

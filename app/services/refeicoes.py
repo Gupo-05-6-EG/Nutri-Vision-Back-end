@@ -1,18 +1,20 @@
 """Regras de negocio das refeicoes (RF04, RF12, RF19) e da sincronizacao em lote (RNF07)."""
 
 from collections.abc import Iterable, Sequence
-from datetime import UTC, date, datetime, time, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.tempo import em_fuso_local, intervalo_do_dia
 from app.models.paciente import Paciente
 from app.models.refeicao import CAMPOS_NUTRICIONAIS, ItemRefeicao, Refeicao, TipoRefeicao, somar
 from app.schemas.refeicao import ItemRefeicaoCreate, RefeicaoCreate, RefeicaoUpdate
+from app.services.gamificacao import xp_por_refeicao
 
-# Janelas de horario (hora local tratada como UTC, igual ao resto da app -
-# ver `_em_utc`) usadas para sugerir o tipo quando o cliente nao informa um.
+# Janelas de horario (hora local, no fuso oficial - ver app/core/tempo.py) usadas
+# para sugerir o tipo quando o cliente nao informa um.
 # Fora das janelas de cafe/almoco/jantar cai em lanche, que funciona como
 # categoria coringa (ex.: uma refeicao registrada de madrugada).
 _JANELAS_SUGESTAO: tuple[tuple[int, int, TipoRefeicao], ...] = (
@@ -61,17 +63,11 @@ def _validar_consumida_em(momento: datetime) -> datetime:
 
 def sugerir_tipo(consumida_em: datetime) -> TipoRefeicao:
     """Sugere o tipo da refeicao a partir da hora de `consumida_em` (RF19)."""
-    hora = _em_utc(consumida_em).hour
+    hora = em_fuso_local(consumida_em).hour
     for inicio, fim, tipo in _JANELAS_SUGESTAO:
         if inicio <= hora < fim:
             return tipo
     return TipoRefeicao.LANCHE
-
-
-def _intervalo_do_dia(dia: date) -> tuple[datetime, datetime]:
-    """Limites [inicio, fim) do dia em UTC."""
-    inicio = datetime.combine(dia, time.min, tzinfo=UTC)
-    return inicio, inicio + timedelta(days=1)
 
 
 def criar_refeicao(db: Session, dados: RefeicaoCreate) -> Refeicao:
@@ -86,6 +82,7 @@ def criar_refeicao(db: Session, dados: RefeicaoCreate) -> Refeicao:
         itens=[ItemRefeicao(**item.model_dump()) for item in dados.itens],
     )
     db.add(refeicao)
+    xp_por_refeicao(db, refeicao, por_foto=dados.origem == "foto")
     db.commit()
     db.refresh(refeicao)
     return refeicao
@@ -190,6 +187,7 @@ def criar_refeicoes_em_lote(
             itens=[ItemRefeicao(**item.model_dump()) for item in dados.itens],
         )
         db.add(refeicao)
+        xp_por_refeicao(db, refeicao, por_foto=dados.origem == "foto")
         conhecidas[chave] = refeicao
         novas.append(refeicao)
         resultado.append((refeicao, False))
@@ -246,7 +244,7 @@ def listar_refeicoes(
     consulta = select(Refeicao).where(Refeicao.paciente_id == paciente_id)
 
     if dia is not None:
-        inicio, fim = _intervalo_do_dia(dia)
+        inicio, fim = intervalo_do_dia(dia)
         consulta = consulta.where(Refeicao.consumida_em >= inicio, Refeicao.consumida_em < fim)
 
     if tipo is not None:
