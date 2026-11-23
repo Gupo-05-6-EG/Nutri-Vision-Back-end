@@ -1,0 +1,83 @@
+"""Schemas Pydantic para Gamificacao e Leaderboard Semanal (RF05, RF16, RF29)."""
+
+from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+class HistoricoXPOut(BaseModel):
+    """Registro individual de evento de ganho de experiencia."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    paciente_id: int
+    quantidade: int
+    motivo: str
+    criado_em: datetime
+
+
+class LeaderboardItem(BaseModel):
+    """Entrada no placar semanal de amigos (RF05.3, RF29).
+
+    Restrito a informacoes nao sensiveis (RF-29): apenas pontos de XP na semana,
+    ofensiva (streak) e nome de usuario, resguardando dados de saude.
+    """
+
+    posicao: int = Field(ge=1, description="Posicao no ranking (1 a 10)")
+    paciente_id: int = Field(gt=0, description="Identificador do paciente")
+    username: str | None = Field(default=None, description="Nome de usuario exclusivo")
+    nome: str | None = Field(default=None, description='Nome social, ex.: "Maria S."')
+    xp_semanal: int = Field(ge=0, description="XP ganho dentro da janela semanal vigente")
+    streak: int = Field(ge=0, description="Dias consecutivos de ofensiva ativa")
+    e_voce: bool = Field(default=False, description="Flag indicando se o registro e do solicitante")
+
+    def to_publico(
+        self, nome: str | None = None, avatar: str | None = None
+    ) -> "RankingPublicoItem":
+        """Converte o item do placar para o DTO estritamente publico (LGPD / RF29)."""
+        from app.schemas.privacidade import RankingPublicoItem
+
+        return RankingPublicoItem(
+            nome=nome or self.username,
+            avatar=avatar,
+            pontos=self.xp_semanal,
+            streak=self.streak,
+        )
+
+
+class LeaderboardOut(BaseModel):
+    """Leaderboard de amigos com base no XP acumulado na janela semanal."""
+
+    inicio_semana: datetime = Field(
+        description="Inicio da semana local (segunda-feira 00:00), em UTC"
+    )
+    fim_semana: datetime = Field(description="Fim da semana local (domingo 23:59:59), em UTC")
+    total_participantes: int = Field(
+        ge=0, description="Total de participantes avaliados na rede do paciente"
+    )
+    posicao_solicitante: int | None = Field(
+        default=None, description="Posicao do usuario solicitante no placar"
+    )
+    ranking: list[LeaderboardItem] = Field(
+        description="Top 10 amigos ordenados por ganho de XP na janela semanal"
+    )
+
+
+# Re-exportacao de DTOs publicos para conformidade LGPD (Item 51)
+from app.schemas.privacidade import (  # noqa: E402
+    DesafioPublicoItem,
+    DesafioPublicoOut,
+    RankingPublicoItem,
+    RankingPublicoOut,
+)
+
+__all__ = [
+    "DesafioPublicoItem",
+    "DesafioPublicoOut",
+    "HistoricoXPOut",
+    "LeaderboardItem",
+    "LeaderboardOut",
+    "RankingPublicoItem",
+    "RankingPublicoOut",
+]

@@ -1,1 +1,957 @@
-# Nutri-Vision-Back-end
+# Nutri Vision — Back-end
+
+API REST do Nutri Vision, em **FastAPI + SQLAlchemy + PostgreSQL**.
+
+## Stack
+
+| Camada | Tecnologia |
+|---|---|
+| Linguagem | Python 3.12 |
+| Autenticação | JWT (PyJWT) + bcrypt |
+| Framework web | FastAPI |
+| ORM | SQLAlchemy 2.0 |
+| Migrations | Alembic |
+| Push | Firebase Cloud Messaging (firebase-admin) |
+| Banco | PostgreSQL 16 |
+| Testes | pytest (SQLite em memória) |
+| Lint/format | ruff |
+| CI | GitHub Actions |
+
+## Estrutura
+
+```
+app/
+├── main.py            # create_app(): CORS, rotas, OpenAPI
+├── core/
+│   ├── config.py      # Settings (pydantic-settings, lê o .env)
+│   └── security.py    # hash de senha (bcrypt) e JWT
+├── db/
+│   ├── base.py        # Base declarativa + convenção de nomes
+│   └── session.py     # engine, SessionLocal, get_db()
+├── api/
+│   ├── deps.py        # UsuarioAtual (usuário do token)
+│   ├── router.py      # agregador da API v1
+│   └── routes/        # um módulo por recurso
+├── models/            # modelos ORM (importar todos no __init__)
+├── schemas/           # schemas Pydantic (entrada/saída)
+└── services/          # regras de negócio
+alembic/               # migrations
+tests/                 # pytest
+```
+
+## Rodando localmente
+
+### Com Docker (recomendado)
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+A API sobe em <http://localhost:8000> e a documentação em <http://localhost:8000/docs>.
+
+### Sem Docker
+
+```bash
+cp .env.example .env
+python -m venv .venv
+.venv\Scripts\activate          # Windows
+# source .venv/bin/activate     # Linux/macOS
+pip install -r requirements-dev.txt
+alembic upgrade head
+uvicorn app.main:app --reload
+```
+
+> Sem Docker você precisa de um PostgreSQL rodando e do `DATABASE_URL` apontando pra ele.
+
+## Variáveis de ambiente
+
+Todas as variáveis estão documentadas em [`.env.example`](.env.example). O arquivo
+`.env` é ignorado pelo git — nunca comite credenciais.
+
+## Migrations
+
+```bash
+alembic revision --autogenerate -m "descricao"
+alembic upgrade head
+alembic downgrade -1
+```
+
+## Desafios entre amigos (RF05.2, RF05.3, RF05.5)
+
+Depois de aplicar as migrations, pacientes autenticados podem criar desafios e
+convidar outros pacientes pelo ID. O convite precisa ser aceito para a pessoa
+entrar no placar. Tipos aceitos: `refeicoes` (dias em que as quatro categorias
+de refeição foram registradas), `variacao_calorica` (menor média de diferença absoluta entre o
+consumo diário e a meta calórica) e `sequencia_meta` (maior sequência de dias
+com pelo menos duas refeições e consumo a até 30% da meta, para mais ou para menos, seguindo o critério
+do processamento diário de gamificação). A variação calórica inclui dias sem
+registro como consumo zero. As datas são enviadas com fuso horário.
+
+- `POST /api/v1/challenges`: cria desafio; corpo: `nome`, `tipo`, `regra`,
+  `inicio_em`, `fim_em` e `convidados` (lista de IDs de pacientes, opcional).
+- `POST /api/v1/challenges/{id}/invites`: convida mais pacientes; corpo:
+  `pacientes` (lista de IDs).
+- `POST /api/v1/challenges/{id}/response`: aceita ou recusa; corpo:
+  `aceitar` (booleano).
+- `GET /api/v1/challenges`: lista desafios dos quais o usuário participa ou
+  para os quais foi convidado, com seu status.
+- `GET /api/v1/challenges/{id}/leaderboard`: retorna posições e pontuações;
+  apenas participantes que aceitaram o convite podem consultar o placar.
+
+### Notificações motivacionais de desafios via FCM (RF05.5)
+
+O job diário (`python -m scripts.enviar_notificacoes_desafios`) percorre os desafios ativos
+(`inicio_em <= agora <= fim_em`), calcula a posição de cada participante com convite aceito
+e envia uma notificação push via FCM para os aparelhos registrados em `dispositivos_push`
+(ex.: `"Você está em 2º lugar — faltam 2 dias para vencer o desafio!"`).
+
+- **Limite de frequência:** a tabela `notificacoes_desafio` possui restrição única por
+  `(paciente_id, enviado_em)` no fuso `America/Sao_Paulo`, garantindo no máximo **1 push de
+  desafio por participante por dia**, mesmo que o participante esteja em múltiplos desafios
+  simultâneos ou que o job seja executado mais de uma vez no mesmo dia.
+- **Tokens inválidos** reportados pelo FCM são removidos automaticamente de `dispositivos_push`.
+
+```cron
+CRON_TZ=America/Sao_Paulo
+0 9 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.enviar_notificacoes_desafios
+```
+
+## Populando a TACO
+
+Depois das migrations (`alembic upgrade head`), importe a Tabela Brasileira de
+Composição de Alimentos (TACO, 4ª edição, NEPA/UNICAMP) para a tabela `alimento_taco`:
+
+```bash
+python scripts/importar_taco.py            # importa se a tabela estiver vazia
+python scripts/importar_taco.py --recriar   # apaga tudo e reimporta
+```
+
+Os dados ficam em [`data/taco.csv`](data/taco.csv) (590 alimentos, valores por 100g).
+Fonte: planilha oficial da UNICAMP, via [raulfdm/taco-api](https://github.com/raulfdm/taco-api)
+(MIT). Sete itens da tabela original ficaram de fora por terem macro nutriente
+essencial em branco na própria fonte (ex.: leite integral e desnatado sem
+`kcal`/`proteína` preenchidos).
+
+## Segurança e controle de acesso (RNF06)
+
+**Autenticação.** Todo endpoint, exceto `/health*`, `/auth/cadastro/*` e `/auth/login`,
+exige `Authorization: Bearer <token>`. Sem token válido a resposta é `401`. O perfil
+(`paciente`/`nutricionista`) é lido do **banco**, não do token.
+
+**Autorização por perfil e vínculo** (`app/api/deps.py`). `paciente_id` continua vindo
+no caminho, na query ou no corpo, e é conferido contra o token:
+
+| Operação | Quem pode |
+|---|---|
+| Ler refeições, consumo diário e alimentos personalizados de um paciente | o próprio paciente ou o nutricionista **com vínculo** com ele |
+| Triagem, lembretes, token de push, registrar/editar/remover refeição, cadastrar alimento personalizado | só o próprio paciente |
+| Gerar código de vinculação (`/linking-code`) | só nutricionista |
+| Resgatar código (`/link`) | só paciente |
+| Prévia do código (`/linking-code/{codigo}/previa`) | qualquer um (o paciente ainda não tem conta); só nome e CRN do profissional |
+| Busca na TACO (`/alimentos-taco`, `/alimentos` sem `paciente_id`) e `/calculo-nutricional` | qualquer usuário logado |
+| Análise de fotos pela IA (`/analises`) | só pacientes |
+| Gamificação e amizades (`/gamificacao/*`, `/amizades/*`) | só paciente, sempre em nome de quem está logado (o id vem do token) |
+
+Sem acesso a resposta é `403` — inclusive quando o paciente não existe, para a API não
+revelar quais ids existem. Ter vínculo com um paciente não dá acesso a outro.
+
+**HTTPS.** Com `HTTPS_ONLY=true` a API redireciona `http` → `https` e envia
+`Strict-Transport-Security`. Atrás de proxy que termina o TLS, o proxy deve mandar
+`X-Forwarded-Proto` e o uvicorn precisa confiar nele (`FORWARDED_ALLOW_IPS`).
+
+**Criptografia em repouso.** Senhas e códigos de vinculação são gravados só como hash.
+Os dados de saúde (`pacientes.peso_kg`, `altura_cm`, `idade`, `genero`,
+`nivel_atividade` e `refeicoes.observacao`) são gravados cifrados com Fernet usando
+`ENCRYPTION_KEY` (`app/core/crypto.py`). O ORM continua devolvendo `Decimal`/`int`/`str`;
+no banco fica texto opaco, então essas colunas não podem ser filtradas nem somadas em
+SQL. **Perder a chave = perder esses dados**, e a chave não pode ser trocada em um banco
+que já tem dados.
+
+## Backup e recuperação (RNF10)
+
+O serviço `backup` do `docker-compose.yml` faz o backup automático do banco e testa a
+restauração. Os scripts ficam em [`scripts/backup/`](scripts/backup/) e só usam as
+ferramentas do Postgres (`pg_dump`, `pg_restore`, `psql`).
+
+| O quê | Quando (padrão) | Onde |
+|---|---|---|
+| Backup (`pg_dump -Fc` + `sha256`) | todo dia às 03:00 (`BACKUP_CRON`) | `$BACKUP_HOST_DIR/diario/` |
+| Cópia semanal | o backup de domingo | `$BACKUP_HOST_DIR/semanal/` |
+| Teste de restauração | domingo às 03:30 (`BACKUP_TESTE_CRON`) | resultado em `$BACKUP_HOST_DIR/restauracoes.log` |
+
+**Retenção:** 7 backups diários (`BACKUP_RETENCAO_DIAS`) e 4 semanais
+(`BACKUP_RETENCAO_SEMANAS`). **Local separado:** `BACKUP_HOST_DIR` (padrão `./backups`)
+deve apontar para outro disco, um NAS ou uma pasta sincronizada com a nuvem; nunca para
+o mesmo volume do banco. Os horários seguem o `TZ` (padrão `America/Sao_Paulo`).
+
+```bash
+docker compose up -d backup                          # agenda backup e teste
+docker compose logs -f backup                        # acompanha as execuções
+docker compose exec backup sh /scripts/backup.sh     # backup na hora
+docker compose exec backup sh /scripts/testar_restauracao.sh
+```
+
+O **teste de restauração** restaura o backup mais recente num banco temporário
+(`<banco>_teste_restauracao`) e confere o checksum, a presença de todas as tabelas do
+banco em uso e a versão do Alembic. Depois registra no log as contagens por tabela e
+apaga o banco temporário. Exemplo de linha do log:
+
+```
+2026-11-01T06:30:02Z OK nutrivision_20261101_060000.dump: alimento_taco=590 pacientes=12 ...
+```
+
+**Recuperar os dados** (apaga o conteúdo atual do banco, por isso pede confirmação):
+
+```bash
+docker compose stop api
+docker compose exec -e CONFIRMAR=sim backup sh /scripts/restaurar.sh /backups/diario/<arquivo>.dump
+docker compose start api
+```
+
+Para restaurar em outro banco (ex.: investigar um dado antigo sem mexer no principal),
+passe o nome como segundo argumento: `sh /scripts/restaurar.sh <arquivo>.dump copia`.
+O CI (job *Backup e restauração*) roda backup, retenção e restauração contra um
+Postgres a cada push.
+
+## Produção e monitoramento (RNF09, RNF11)
+
+```bash
+cp .env.example .env    # troque SECRET_KEY, senhas e ENVIRONMENT=production
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build --scale api=2
+```
+
+O [`docker-compose.prod.yml`](docker-compose.prod.yml) sobrepõe o de desenvolvimento:
+
+| Item | Como |
+|---|---|
+| Entrada única | `proxy` (nginx, [`deploy/nginx.conf`](deploy/nginx.conf)) na porta `API_PORT`; banco e API ficam só na rede interna |
+| Escala horizontal | `--scale api=N` réplicas, cada uma com `WEB_CONCURRENCY` processos; o nginx distribui entre elas |
+| Migrations | `alembic upgrade head` na subida da API |
+| Disponibilidade | `restart: unless-stopped`; o healthcheck usa `/health/db`, e réplica sem banco sai de `healthy` |
+| Segurança | imagem roda como usuário sem root (`app`) |
+| Logs | JSON (uma linha por evento) com rotação (`10m` × 5 arquivos) |
+
+**Health checks.** `GET /api/v1/health` (liveness: o processo responde) e
+`GET /api/v1/health/db` (readiness: o banco responde, senão `503`). Para monitorar o
+uptime há o workflow [`uptime.yml`](.github/workflows/uptime.yml): a cada 15 minutos ele
+chama `/api/v1/health/db` na URL da variável de repositório `UPTIME_URL` (Settings →
+Secrets and variables → Actions → Variables). Depois de 3 tentativas falhas, abre uma
+issue com a label `uptime` (ou comenta na aberta), e fecha a issue quando a API volta.
+Sem `UPTIME_URL` ele só registra um aviso. Um monitor externo (UptimeRobot, Better
+Stack...) pode ser somado a ele para alertas por Telegram ou SMS.
+
+**Imagem para o deploy.** O workflow [`imagem.yml`](.github/workflows/imagem.yml)
+publica a imagem no GitHub Container Registry a cada push na `main` (tags `latest` e
+`sha-<commit>`) e em tags `v*`. No servidor, basta trocar o `build` pela imagem:
+
+```bash
+docker pull ghcr.io/gupo-05-6-eg/nutri-vision-back-end:latest
+```
+
+**Fila de inferência.** A análise de fotos é desacoplada no
+[Nutri-Vision-IA](https://github.com/Gupo-05-6-EG/Nutri-Vision-IA): a API da IA
+enfileira cada foto no Redis (RQ), e o serviço `worker` processa a fila. Para escalar,
+suba mais workers com `docker compose up -d --scale worker=N`.
+
+**Logs e rastreio.** Toda resposta traz `X-Request-ID` (o do cliente, se vier, ou um
+gerado). Esse id aparece em todas as linhas de log da requisição. Cada requisição gera
+uma linha de acesso:
+
+```json
+{"ts": "2026-10-27T00:01:05.76+00:00", "nivel": "INFO", "logger": "nutrivision.acesso", "msg": "GET /api/v1/health/db 200", "metodo": "GET", "caminho": "/api/v1/health/db", "status": 200, "duracao_ms": 1.7, "request_id": "5593f92a..."}
+```
+
+Erros não tratados saem com `nivel: ERROR` e o traceback em `erro`. Num agregador de
+logs, alertas úteis são `nivel = ERROR`, `status >= 500` e `duracao_ms` alto.
+`LOG_LEVEL` ajusta o nível, e `LOG_JSON` força o formato (padrão: JSON só em produção).
+
+## Testes e qualidade
+
+```bash
+pytest                      # testes
+pytest --cov=app            # com cobertura
+ruff check .                # lint
+ruff format .               # formatação
+```
+
+## CI/CD (RNF08)
+
+O workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) roda em todo push e
+pull request para `main`/`dev`, com cinco jobs:
+
+1. **lint** — `ruff check` + `ruff format --check`
+2. **test** — `pytest` com cobertura
+3. **migrations** — `alembic upgrade head` + `alembic check` contra um Postgres real
+4. **backup** — backup, retenção e teste de restauração contra um Postgres real
+5. **docker** — build da imagem e validação do `/health` no container
+
+Além dele, [`imagem.yml`](.github/workflows/imagem.yml) publica a imagem no GHCR e
+[`uptime.yml`](.github/workflows/uptime.yml) monitora a API publicada.
+
+## Modelo de dados
+
+### `usuarios` — credenciais e perfil (RF13)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `nome` | varchar(120) | |
+| `email` | varchar(254) | único, sempre gravado em minúsculas |
+| `senha_hash` | varchar(60) | hash bcrypt — a senha nunca é gravada |
+| `perfil` | varchar(20) | `paciente` \| `nutricionista` |
+| `criado_em` | timestamptz | |
+
+Os dados específicos de cada perfil ficam numa tabela própria com **o mesmo id**
+do usuário: `pacientes` (triagem, teto calórico) e `nutricionistas`.
+
+### `nutricionistas`
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK e FK → `usuarios.id`, `ON DELETE CASCADE` |
+| `crn` | varchar(20) | único; normalizado em maiúsculas (ex.: `CRN-3 12345`) |
+
+### `refeicoes` — uma refeição registrada por um paciente
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | FK → `pacientes.id`, `ON DELETE CASCADE`; indexado |
+| `consumida_em` | timestamptz | quando a refeição foi consumida (gravado em UTC) |
+| `tipo` | varchar(20) | `cafe_da_manha` \| `almoco` \| `lanche` \| `jantar` (RF19) |
+| `observacao` | text (cifrado) | opcional; até 500 caracteres (valida o schema) |
+| `criada_em` / `atualizada_em` | timestamptz | auditoria |
+
+### `itens_refeicao` — os alimentos daquela refeição
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `refeicao_id` | int | FK → `refeicoes.id`, `ON DELETE CASCADE` |
+| `nome_alimento` | varchar(160) | texto livre; o `alimento_id` da TACO entra na Task 2.2 |
+| `quantidade_g` | numeric(8,2) | `> 0` (check constraint) |
+| `calorias_kcal` | numeric(8,2) | `>= 0` |
+| `proteinas_g` | numeric(8,2) | `>= 0` |
+| `carboidratos_g` | numeric(8,2) | `>= 0` |
+| `gorduras_g` | numeric(8,2) | `>= 0` |
+
+**Os totais não são colunas.** Calorias e macros de uma refeição (e do dia) são
+somados a partir dos itens na hora da leitura — uma soma gravada no banco
+divergiria dos itens na primeira edição.
+
+Índice `(paciente_id, consumida_em)` sustenta o histórico e o consumo diário.
+Índice `(paciente_id, tipo)` sustenta o filtro por tipo (RF19).
+
+**Categorização automática (RF19).** Se `tipo` não vier no `POST`, o service
+sugere um valor a partir da hora de `consumida_em`: `cafe_da_manha` (05h–11h),
+`almoco` (11h–15h), `jantar` (18h–22h); qualquer outro horário cai em `lanche`,
+que funciona como categoria coringa. O cliente pode sempre informar `tipo`
+explicitamente para sobrepor a sugestão.
+
+### `pacientes` — triagem e teto calórico diário inicial
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK e FK → `usuarios.id` (`ON DELETE CASCADE`), **sem autoincrement**: é o id do usuário |
+| `peso_kg` | text (cifrado) | opcional; `Decimal` `> 0` (valida o schema) |
+| `altura_cm` | text (cifrado) | opcional; `Decimal` `> 0` (valida o schema) |
+| `idade` | text (cifrado) | opcional; `int` `> 0` (valida o schema) |
+| `genero` | text (cifrado) | `masculino` \| `feminino` |
+| `nivel_atividade` | text (cifrado) | `sedentario` \| `leve` \| `moderado` \| `intenso` \| `muito_intenso` |
+| `meta_kcal` | numeric(6,2) | teto calórico diário vigente; `>= 0` |
+| `origem_meta` | varchar(30) | de onde veio a meta (hoje só `harris_benedict`) |
+| `streak` | int | dias consecutivos que cumpriram a regra diária (inicia em `0`) |
+| `xp` | int | pontos acumulados; cada dia válido soma `50` |
+| `gamificacao_processada_em` | date | último dia fechado, impede crédito duplicado |
+| `bloqueios_perda` | int | saldo de bloqueios, inicialmente zero |
+
+As colunas são opcionais porque o cadastro cria o paciente antes da triagem.
+
+`streak` e `xp` guardam, respectivamente, os dias consecutivos que cumpriram a
+regra de gamificação e os pontos acumulados. O fechamento diário considera as
+refeições no fuso `America/Sao_Paulo`: com pelo menos 2 refeições e consumo a
+até 30% da meta do dia (para mais ou para menos), soma 1 ao streak e 50 XP. A meta
+é a mesma que o app mostra: a do plano ativo do nutricionista e, sem plano, a da
+triagem (`meta_kcal`). Os desafios de meta usam a mesma regra. Quando a regra falha,
+consome um bloqueio se houver saldo e uma ofensiva ativa. Nesse caso, mantém
+o streak e o XP. Sem proteção, zera o streak.
+O fechamento não altera XP quando a regra não é cumprida. Pacientes sem meta
+calórica também não cumprem a regra.
+
+**XP só por regras internas** (não há rota para conceder XP): cada ganho grava
+um registro em `historico_xp`, que alimenta o ranking semanal.
+
+| Evento | XP |
+|---|---|
+| Boas-vindas, no cadastro do paciente | 50 |
+| Refeição registrada (uma por tipo de refeição por dia local) | 10 |
+| Refeição registrada por foto (`"origem": "foto"`, no lugar dos 10) | 20 |
+| Dia dentro da meta (fechamento diário) | 50 |
+| Incentivo do nutricionista vinculado (uma vez por dia) | 10 |
+
+**Agendamento.** No `docker compose up` o serviço `agendador` faz o papel do
+cron para os dois fechamentos diários: a ofensiva (com o XP do dia na meta) e os
+alertas de desvio de meta. Ao subir, e depois todo dia às 00:05 de São Paulo
+(`AGENDADOR_HORARIO`), ele fecha o dia que acabou. O dia só é fechado depois de
+terminar, então as refeições até 23:59 contam. Se o serviço ficar parado, a
+ofensiva recupera até 7 dias quando ele voltar. Uma falha num fechamento vai para
+o log e não impede o outro.
+
+Os **alertas de desvio** avaliam a janela de dias consecutivos que termina
+**ontem**, o último dia completo: com a regra "2 dias", compara ontem e
+anteontem. O dia de hoje, ainda em andamento, fica de fora, então um café da manhã
+sozinho não vira alerta "abaixo da meta". O botão "Verificar desvios agora" do
+painel (`POST /alertas-desvio/processar`) usa a mesma janela. Rodar de novo não
+duplica: há no máximo um alerta por paciente para cada data de referência.
+
+Sem Docker, agende os dois scripts pelo cron do ambiente:
+
+```cron
+CRON_TZ=America/Sao_Paulo
+5 0 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_gamificacao
+6 0 * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.processar_alertas_desvio
+```
+
+No Windows, configure o Agendador de Tarefas para executar diariamente às 00:05
+o interpretador `.venv\Scripts\python.exe`, com os argumentos
+`-m scripts.processar_gamificacao` e `-m scripts.processar_alertas_desvio`, e
+diretório de trabalho na raiz do projeto. Para refazer um dia específico, os dois
+aceitam `--dia AAAA-MM-DD` (nos alertas, o último dia da janela).
+O campo `gamificacao_processada_em` impede crédito duplicado se o job for
+executado de novo para o mesmo dia.
+
+No fechamento, o job concede as conquistas de 30 dias de ofensiva e 100
+refeições registradas. A conquista fica registrada mesmo se a ofensiva cair
+ou refeições forem excluídas depois.
+
+`GET /api/v1/gamificacao/conquistas` retorna o catálogo e o progresso do
+paciente autenticado. Cada item tem `codigo`, `nome`, `meta`, `progresso`
+e `obtida_em`. A data é nula até que o fechamento conceda a conquista.
+O paciente autenticado pode consultar streak, XP, saldo e custo em
+`GET /api/v1/gamificacao`. Cada chamada a `POST /api/v1/gamificacao/bloqueios`
+troca 100 XP por um bloqueio e devolve o estado atualizado. A API responde
+com 409 se o saldo for insuficiente.
+
+### `lembretes_refeicao` — horário de lembrete por refeição (RF26)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | FK → `pacientes.id`, `ON DELETE CASCADE` |
+| `tipo` | varchar(20) | `cafe_da_manha` \| `almoco` \| `lanche` \| `jantar`; único por paciente (`uq_lembretes_refeicao_paciente_tipo`) |
+| `horario` | time | hora local (`America/Sao_Paulo`) em que o lembrete dispara |
+| `ativo` | boolean | `true` por padrão |
+| `ultimo_envio_em` | date | último dia em que o push foi enviado; garante no máximo 1 lembrete por refeição por dia |
+| `criado_em` / `atualizado_em` | timestamptz | auditoria |
+
+### `dispositivos_push` — token FCM dos aparelhos do paciente (RF26)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | FK → `pacientes.id`, `ON DELETE CASCADE`; indexado |
+| `token` | varchar(512) | token FCM; único. Se um token já registrado for enviado por outro paciente, ele passa a ser deste |
+| `criado_em` | timestamptz | |
+
+### Lembretes de refeição (RF26)
+
+O app salva o horário de cada refeição e registra o token FCM do aparelho; um job
+no backend envia o push quando a refeição não foi registrada.
+
+```bash
+# salva os horários (só os tipos enviados são alterados; "ativo" é opcional, padrão true)
+curl -X PUT http://localhost:8000/api/v1/pacientes/1/lembretes-refeicao \
+  -H 'Content-Type: application/json' \
+  -d '{"lembretes": [{"tipo": "cafe_da_manha", "horario": "07:30"}, {"tipo": "jantar", "horario": "20:00", "ativo": false}]}'
+
+# registra o token FCM do aparelho (idempotente)
+curl -X PUT http://localhost:8000/api/v1/pacientes/1/dispositivos-push \
+  -H 'Content-Type: application/json' -d '{"token": "<token FCM>"}'
+```
+
+**Regra do job.** Para cada lembrete ativo cujo horário já passou, se o paciente
+**não registrou** nenhuma refeição daquele `tipo` na janela da refeição, o job envia o
+push para todos os aparelhos dele — no máximo uma vez por dia (`ultimo_envio_em`).
+
+- **Janela:** do início da faixa do tipo até o momento do envio — café 05h, almoço 11h,
+  lanche 15h, jantar 18h (mesmas faixas do RF19). Se o horário configurado for anterior
+  ao início da faixa, a janela começa no horário.
+- **Tolerância:** o push só sai até 60 min depois do horário configurado
+  (`TOLERANCIA_ENVIO`), então um job parado ou um lembrete editado no fim do dia não
+  gera notificações atrasadas.
+- **Mudar o horário** de um lembrete libera um novo envio no mesmo dia, se ainda estiver
+  dentro da tolerância.
+- **Sem aparelho** registrado, ou se todos os envios falharem, nada é marcado como
+  enviado: a próxima execução tenta de novo (dentro da tolerância).
+- **Token inválido** (o FCM responde que não existe mais) é apagado de `dispositivos_push`.
+- Conteúdo do push: título "Hora de registrar sua refeição" e `data` com
+  `tipo_notificacao=lembrete_refeicao` e `tipo_refeicao=<tipo>` (para o app abrir a tela certa).
+
+**Configuração.** Gere uma chave de conta de serviço no Firebase (Configurações do projeto
+→ Contas de serviço) e aponte `FCM_CREDENTIALS_FILE` para o JSON. Nunca comite esse arquivo.
+No Docker, monte o arquivo no container e ajuste o caminho no `.env`.
+
+**Agendamento.** Rode a cada 5 minutos pelo cron do ambiente:
+
+```cron
+*/5 * * * * cd /caminho/Nutri-Vision-Back-end && .venv/bin/python -m scripts.enviar_lembretes_refeicao
+```
+
+No Windows, use o Agendador de Tarefas repetindo a cada 5 minutos o interpretador
+`.venv\Scripts\python.exe` com o argumento `-m scripts.enviar_lembretes_refeicao` e o
+diretório de trabalho na raiz do projeto.
+
+### `alimento_taco` — Banco Nutricional TACO (RF02.2)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `nome` | varchar(150) | indexado (usado na busca) |
+| `categoria` | varchar(80) | categoria da TACO (ex.: "Cereais e derivados") |
+| `kcal_100g` | numeric(6,2) | por 100g |
+| `carbs_100g` | numeric(6,2) | por 100g |
+| `prot_100g` | numeric(6,2) | por 100g |
+| `gord_100g` | numeric(6,2) | por 100g |
+
+Populada a partir da Tabela Brasileira de Composição de Alimentos (TACO, 4ª edição,
+NEPA/UNICAMP) — veja [Populando a TACO](#populando-a-taco). O `alimento_id` em
+`itens_refeicao` (ligando um item da refeição a um alimento desta tabela) entra
+numa task futura, quando o front passar a montar refeições a partir da busca.
+
+### `alimento_personalizado` — alimentos criados pelo paciente (RF22)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | indexado; a FK para `usuarios` entra na Task 1.2 |
+| `nome` | varchar(150) | indexado; único por paciente (`uq_alimento_personalizado_paciente_nome`) |
+| `kcal_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `carbs_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `prot_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `gord_100g` | numeric(6,2) | por 100g; `>= 0` |
+| `criado_em` | timestamptz | auditoria |
+
+Mesmo formato por 100g da `alimento_taco`. Na API, `kcal_100g` vai até 900, cada macro
+até 100 e carboidratos + proteínas + gorduras até 100 (g por 100g de alimento).
+
+**Busca unificada.** `GET /api/v1/alimentos?nome=` devolve, numa lista só e em ordem
+alfabética, alimentos da TACO e os personalizados do `paciente_id` informado. Sem
+`paciente_id` só vem TACO: um alimento personalizado nunca aparece para outro paciente.
+Cada item traz `origem` (`taco` \| `personalizado`) e `categoria` (`"Personalizado"` nos
+personalizados); como os ids se repetem entre as duas tabelas, o alimento é identificado
+por `origem` + `id`. Nome repetido do mesmo paciente (ignorando maiúsculas) → `409`.
+`GET /api/v1/alimentos-taco` continua buscando só na TACO.
+
+### `planos_alimentares` — versões do plano do paciente (RF08)
+
+Cada vez que o nutricionista salva o plano, nasce uma linha nova (uma **versão**) e a
+anterior é desativada; as antigas ficam no banco, sem alteração.
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `versao` | int | número sequencial por paciente (1 = primeiro plano); `UNIQUE (paciente_id, versao)` |
+| `ativo` | bool | só a versão mais nova fica `true` |
+| `nutricionista_id` | int \| null | autor da versão; vira `null` se a conta for removida |
+
+A migration `c4d9e1f6a2b3` numera os planos que já existiam (1, 2, 3... na ordem de criação).
+
+### `auditorias` — quem mudou o quê (RNF08)
+
+| Coluna | Tipo | Observação |
+|---|---|---|
+| `id` | int | PK |
+| `paciente_id` | int | FK `pacientes.id`, `ON DELETE CASCADE` (apagar o paciente apaga as cópias de dados de saúde) |
+| `autor_id` | int \| null | FK `usuarios.id`, `ON DELETE SET NULL` (a auditoria sobrevive à conta de quem alterou) |
+| `entidade` | varchar(30) | `plano_alimentar` ou `dados_clinicos` |
+| `registro_id` | int | o plano (versão nova) ou o próprio paciente |
+| `acao` | varchar(20) | `criacao` (não havia valor antes) ou `atualizacao` |
+| `antes` | texto cifrado (JSON) | valores antes da alteração; `null` na criação |
+| `depois` | texto cifrado (JSON) | valores depois da alteração |
+| `criado_em` | timestamptz | quando |
+
+Só recebe linhas novas: nenhuma rota edita ou apaga auditoria. `antes` e `depois` são
+cópias de dados de saúde, então vão **cifrados** para o banco (mesma `ENCRYPTION_KEY` do
+RNF06). A linha de auditoria entra na mesma transação da alteração: ou as duas
+acontecem, ou nenhuma. Índice em `(paciente_id, criado_em)`.
+
+## Endpoints
+
+| Método | Rota | Descrição |
+|---|---|---|
+| GET | `/api/v1/health` | Liveness |
+| GET | `/api/v1/health/db` | Readiness (consulta o banco) |
+| POST | `/api/v1/auth/cadastro/paciente` | Cadastra paciente e devolve o token (RF13) |
+| POST | `/api/v1/auth/cadastro/nutricionista` | Cadastra nutricionista e devolve o token (RF13) |
+| POST | `/api/v1/auth/login` | Login com email e senha (RF13) |
+| GET | `/api/v1/auth/me` | Usuário do token (🔒 Bearer) |
+| POST | `/api/v1/linking-code` | Gera um codigo de vinculacao de 6 digitos para o nutricionista autenticado |
+| POST | `/api/v1/link` | Paciente resgata um codigo e cria uma solicitacao pendente |
+| POST | `/api/v1/link/{nutricionista_id}/aceitar` | Paciente aceita a solicitacao de vinculo |
+| POST | `/api/v1/link/{nutricionista_id}/recusar` | Paciente recusa a solicitacao de vinculo |
+| GET | `/api/v1/linking-code/{codigo}/previa` | Nome e CRN de quem gerou um código válido, para o paciente conferir antes de criar a conta (sem login; inválido ou expirado = 404) |
+| GET | `/api/v1/patients?busca=&status=` | Pacientes do nutricionista; `status` = `ativo` (padrão), `pendente` (resgatou o código e não aceitou) ou `todos` |
+| GET | `/api/v1/nutricionista/visao-geral?status=&busca=&pagina=&por_pagina=` | Visão geral da carteira: indicadores (ativos, pendentes, alertas críticos, adesão média, ofensiva média) e monitoramento por paciente (meta, consumo de hoje, adesão semanal, ofensiva, último registro, situação) (🔒 nutricionista) |
+| DELETE | `/api/v1/patients/{paciente_id}` | Nutricionista encerra o vinculo ativo |
+| POST | `/api/v1/refeicoes` | Registra uma refeição com seus itens (RF04); `tipo` opcional, sugerido pelo horário se omitido (RF19) |
+| POST | `/api/v1/refeicoes/batch` | Sincroniza em lote as refeições registradas offline no app, sem duplicar reenvios (RNF07) |
+| GET | `/api/v1/refeicoes?paciente_id=&data=&tipo=` | Histórico, opcionalmente de um dia e/ou tipo (RF12, RF19) |
+| GET | `/api/v1/refeicoes/consumo-diario?paciente_id=&data=&tipo=` | Consumo do dia com os totais, opcionalmente de um tipo (RF12, RF19) |
+| GET | `/api/v1/refeicoes/{id}` | Detalhe de uma refeição |
+| PUT | `/api/v1/refeicoes/{id}` | Atualiza a refeição (substitui os itens) |
+| DELETE | `/api/v1/refeicoes/{id}` | Remove a refeição e seus itens |
+| POST | `/api/v1/pacientes/{paciente_id}/triagem` | Recebe a triagem e gera/salva o teto calórico diário inicial (RF14) |
+| GET | `/api/v1/privacidade/consentimento` | Consulta o histórico e o estado do consentimento (RF28, RNF07) |
+| POST | `/api/v1/privacidade/consentimento` | Registra aceite de uma versão do termo (RF28, RNF07) |
+| POST | `/api/v1/privacidade/consentimento/revogar` | Revoga o consentimento ativo |
+| GET | `/api/v1/privacidade/dados` | Exporta os dados da conta autenticada |
+| DELETE | `/api/v1/privacidade/conta` | Exclui a conta e os dados pessoais associados |
+| POST | `/api/v1/pacientes/{paciente_id}/planos` | Prescreve ou edita o plano: salva uma versão nova e a torna a ativa (🔒 nutricionista vinculado) |
+| GET | `/api/v1/pacientes/{paciente_id}/planos/ativo` | Plano ativo do paciente (🔒 nutricionista vinculado ou o próprio paciente) |
+| GET | `/api/v1/pacientes/{paciente_id}/planos/versoes` | Histórico de versões do plano, da mais nova para a mais antiga (RF08, 🔒 nutricionista vinculado) |
+| PUT | `/api/v1/pacientes/{paciente_id}/planos/rascunho` | Salva o rascunho do plano (um por paciente; não vale para o paciente até ser publicado) (🔒 nutricionista vinculado) |
+| GET | `/api/v1/pacientes/{paciente_id}/planos/rascunho` | Rascunho salvo do plano (🔒 nutricionista vinculado) |
+| POST | `/api/v1/pacientes/{paciente_id}/planos/rascunho/publicar` | Prescreve o rascunho como uma versão nova e o apaga (🔒 nutricionista vinculado) |
+| DELETE | `/api/v1/pacientes/{paciente_id}/planos/rascunho` | Descarta o rascunho (🔒 nutricionista vinculado) |
+| GET | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Lista os horários de lembrete de refeição (RF26) |
+| PUT | `/api/v1/pacientes/{paciente_id}/lembretes-refeicao` | Salva os horários de lembrete por refeição (RF26) |
+| PUT | `/api/v1/pacientes/{paciente_id}/dispositivos-push` | Registra o token FCM do aparelho (RF26) |
+| GET | `/api/v1/alimentos-taco?nome=` | Busca alimentos da TACO por nome (RF02.2) |
+| POST | `/api/v1/alimentos-personalizados` | Cadastra um alimento sem correspondência na TACO, com valores por 100g (RF22) |
+| POST | `/api/v1/analises` | Envia a foto do prato para a IA analisar (multipart `file` e, opcional, `tipo_prato` = `raso`/`fundo` como dica para as gramas; 🔒 paciente) |
+| GET | `/api/v1/analises/{id}` | Andamento e resultado da análise: alimentos da TACO com kcal/macros das gramas estimadas (🔒 paciente) |
+| POST | `/api/v1/calculo-nutricional` | Calcula kcal/macros por porção, por id da TACO ou classe da IA (RF03, RF20, RF21) |
+| POST | `/api/v1/amizades` | Convida outro paciente pelo e-mail exato com que ele se cadastrou (`{"email": ...}`, RF05) |
+| PUT | `/api/v1/amizades/{id}/responder` | Aceita ou recusa convite de amizade recebido (RF05) |
+| GET | `/api/v1/amizades?status=` | Lista amigos e convites do paciente logado (RF05) |
+| DELETE | `/api/v1/amizades/{id}` | Desfaz uma amizade ou cancela uma solicitação (RF05) |
+| GET | `/api/v1/gamificacao/leaderboard?limite=` | Leaderboard: Top 10 amigos do paciente logado por ganho de XP na janela semanal (RF05.3, RF29) |
+| GET | `/api/v1/gamificacao/ranking-publico?limite=` | Ranking semanal dos amigos do paciente logado expondo só nome, avatar, pontos e streak (RF29, RNF07) |
+| GET | `/api/v1/gamificacao/desafios/{id}/publico` | Placar de um desafio (só para quem participa) expondo só nome, avatar, pontos e streak (RF05.2, RF29) |
+| GET | `/api/v1/gamificacao/historico-xp` | Histórico auditável de XP do paciente logado (RF16) |
+| GET | `/api/v1/pacientes/{paciente_id}/perfil` | Perfil: triagem, IMC, TMB, meta diária única (plano ativo, senão triagem), XP, ofensiva e divisão (🔒 o próprio paciente ou nutricionista vinculado) |
+| POST | `/api/v1/pacientes/{paciente_id}/incentivo` | Nutricionista vinculado dá +10 XP de incentivo, uma vez por dia (🔒 nutricionista vinculado) |
+| GET | `/docs` | Swagger UI |
+
+> Os endpoints de vinculação exigem o token do login (`Authorization: Bearer ...`):
+> o perfil e o autor do código vêm do usuário do token. O código é numérico, tem
+> 6 dígitos e expira após o período definido em `LINKING_CODE_EXPIRE_MINUTES`.
+
+> **`paciente_id` por parâmetro é temporário.** O login já existe, mas refeições e
+> triagem ainda não exigem token: a Task 1.6 (RNF06) passa a exigir e a validar se
+> quem chama é o próprio paciente ou um nutricionista vinculado. O `paciente_id`
+> precisa ser de um paciente cadastrado (senão `422` em refeições e `404` na triagem).
+
+### Privacidade e direitos do titular (RF28, RNF07)
+
+Todas as rotas de privacidade exigem autenticação e operam somente sobre a conta do token. O aceite recebe `{"versao_termo": "1.0"}` e grava a versão e o instante; o histórico pode ser consultado e a revogação registra seu instante sem apagar o aceite anterior. Repetir o aceite da mesma versão enquanto ativo é idempotente.
+
+`GET /api/v1/privacidade/dados` exporta o perfil, consentimentos e registros relacionados à conta (triagem, refeições e itens, alimentos personalizados e vínculos, conforme o perfil). `DELETE /api/v1/privacidade/conta` exclui a conta autenticada; os dados vinculados são removidos pelas chaves estrangeiras em cascata e os alimentos personalizados do paciente são removidos explicitamente. A exclusão é permanente e responde `204`.
+
+### Autenticação (RF13)
+
+Cadastro e login devolvem a mesma resposta, então o app sai do cadastro já logado:
+
+```json
+{
+  "access_token": "eyJhbGciOiJIUzI1NiIs...",
+  "token_type": "bearer",
+  "expira_em": "2026-10-05T19:30:00Z",
+  "usuario": {
+    "id": 1,
+    "nome": "Ana Souza",
+    "email": "ana@exemplo.com",
+    "perfil": "paciente",
+    "crn": null,
+    "criado_em": "2026-09-28T19:30:00Z"
+  }
+}
+```
+
+Nas rotas protegidas, mande o token no header `Authorization: Bearer <access_token>`.
+No Swagger (`/docs`), use o botão **Authorize** e cole só o token.
+
+| Regra | Detalhe |
+|---|---|
+| Senha | 8 caracteres no mínimo, 72 bytes no máximo (limite do bcrypt); gravada só como hash bcrypt |
+| Email | validado e normalizado para minúsculas (`Ana@X.com` e `ana@x.com` são o mesmo) |
+| Token | JWT HS256 com `sub` (id do usuário), `perfil` e `exp`; expira em **7 dias** (`ACCESS_TOKEN_EXPIRE_MINUTES`) |
+| Paciente | cadastro pede `nome`, `email`, `senha`; peso/altura/etc. vêm depois, na triagem |
+| Nutricionista | além disso exige `crn` (único) |
+
+| Situação | Resposta |
+|---|---|
+| Email ou CRN já cadastrado | `409` |
+| Email inexistente ou senha errada | `401` `"Email ou senha invalidos"` (não diz qual dos dois) |
+| Sem token, token inválido ou expirado | `401` |
+| Dados inválidos | `422` |
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/cadastro/paciente   -H 'Content-Type: application/json'   -d '{"nome": "Ana Souza", "email": "ana@exemplo.com", "senha": "senha-forte-123"}'
+
+curl -X POST http://localhost:8000/api/v1/auth/cadastro/nutricionista   -H 'Content-Type: application/json'   -d '{"nome": "Bruno Lima", "email": "bruno@exemplo.com", "senha": "senha-forte-123", "crn": "CRN-3 12345"}'
+
+curl -X POST http://localhost:8000/api/v1/auth/login   -H 'Content-Type: application/json'   -d '{"email": "ana@exemplo.com", "senha": "senha-forte-123"}'
+
+curl http://localhost:8000/api/v1/auth/me -H "Authorization: Bearer $TOKEN"
+```
+
+Para proteger uma rota nova, basta receber o usuário do token:
+
+```python
+from app.api.deps import UsuarioAtual
+
+@router.get("/algo")
+def algo(usuario: UsuarioAtual, db: DbSession): ...
+```
+
+Para aceitar só um perfil (`403` para o outro), use `exigir_perfil`:
+
+```python
+from app.api.deps import exigir_perfil
+
+@router.post("/so-nutri")
+def so_nutri(usuario: Annotated[Usuario, Depends(exigir_perfil(Perfil.NUTRICIONISTA))]): ...
+```
+
+### Exemplo
+
+```bash
+curl -X POST http://localhost:8000/api/v1/refeicoes   -H 'Content-Type: application/json'   -d '{
+    "paciente_id": 1,
+    "consumida_em": "2026-09-20T12:30:00Z",
+    "observacao": "Almoço em casa",
+    "itens": [
+      {"nome_alimento": "Arroz branco cozido", "quantidade_g": 150,
+       "calorias_kcal": 193.5, "proteinas_g": 3.75,
+       "carboidratos_g": 42.45, "gorduras_g": 0.3}
+    ]
+  }'
+
+curl 'http://localhost:8000/api/v1/refeicoes/consumo-diario?paciente_id=1&data=2026-09-20'
+```
+
+### Análise de fotos pela IA (RF02, RF03)
+
+O reconhecimento roda no [Nutri-Vision-IA](https://github.com/Gupo-05-6-EG/Nutri-Vision-IA)
+(Gemini + fila Redis), um serviço à parte apontado por `AI_SERVICE_URL`. O back-end repassa a
+foto e devolve o resultado já ligado à nossa TACO. A análise é assíncrona:
+
+1. `POST /api/v1/analises` (multipart, campo `file`, até 10 MB) → `202 {"id", "status": "QUEUED"}`.
+   Foto borrada ou mal iluminada volta na hora como `NOT_ESTIMATED` com `motivo: bad_photo` e
+   `problemas` (`blurry`, `too_dark`, `too_bright`).
+2. `GET /api/v1/analises/{id}` a cada poucos segundos, até o status sair de `QUEUED`/`PROCESSING`:
+
+```json
+{"id": "6f1c...", "status": "DONE", "versao_modelo": "gemini-3.8-flash",
+ "itens": [
+   {"alimento": "Arroz, tipo 1, cozido", "alimento_taco_id": 12, "gramas": 160.0, "confianca": 0.95,
+    "calorias_kcal": 204.8, "proteinas_g": 4.0, "carboidratos_g": 44.96, "gorduras_g": 0.32},
+   {"alimento": "farofa", "alimento_taco_id": null, "gramas": 30.0, "confianca": 0.7,
+    "calorias_kcal": null, "proteinas_g": null, "carboidratos_g": null, "gorduras_g": null}],
+ "totais": {"calorias_kcal": 204.8, "proteinas_g": 4.0, "carboidratos_g": 44.96, "gorduras_g": 0.32}}
+```
+
+| status | quando |
+|---|---|
+| `QUEUED` / `PROCESSING` | ainda em análise — consulte de novo |
+| `DONE` | alimentos identificados (`itens`, `totais`) |
+| `NOT_ESTIMATED` | não deu para estimar: `motivo` = `bad_photo`, `nothing_detected` ou `low_confidence` |
+| `FAILED` | o modelo falhou mesmo com novas tentativas (`erro`) |
+
+- **Ligação com a TACO pelo nome**, não pelo `taco_id` da IA: ela numera os 597 alimentos da
+  TACO original e a nossa tabela tem 590, com ids diferentes em parte deles. O nome é comparado
+  sem diferença de caixa e de espaços. Alimento que não está na nossa tabela vem com
+  `alimento_taco_id` e macros nulos, e fica fora dos `totais`.
+- As macros usam a mesma fórmula do cálculo por porção (abaixo). Para recalcular depois que o
+  paciente editar as gramas, use `POST /calculo-nutricional` com `alimento_taco_id`.
+- Nada é gravado: o paciente revisa e registra a refeição em `POST /refeicoes`. A foto não é
+  guardada, e o resultado expira na IA depois de 24 h (`404`).
+- Só pacientes analisam fotos (`403` para nutricionista). IA fora do ar ou lenta
+  (`AI_SERVICE_TIMEOUT_S`) → `503`.
+- Para rodar junto: suba o Nutri-Vision-IA (`docker compose up` no repositório dele, porta
+  8000) e aponte `AI_SERVICE_URL` para ele — com o back-end no Docker,
+  `http://host.docker.internal:8000`.
+
+### Cálculo nutricional por porção (RF03, RF20, RF21)
+
+`POST /api/v1/calculo-nutricional` recebe os alimentos com as gramas e devolve a tabela
+nutricional da refeição (kcal, proteínas, carboidratos e gorduras por item e total). Não
+grava nada. Cada item vem de um destes jeitos (podem se misturar):
+
+```json
+{"itens": [
+  {"alimento_taco_id": 12, "gramas": 150},
+  {"classe": "arroz", "metodo_preparo": "cozido", "gramas": 150}
+]}
+```
+
+- `alimento_taco_id`: o id da nossa TACO, como vem em `GET /analises/{id}` — é o que o app
+  usa para recalcular depois que o paciente edita as gramas. Id inexistente → `404`.
+- `classe` + `metodo_preparo`: o formato antigo, convertido pelo de-para abaixo. Informar
+  os dois jeitos no mesmo item, ou nenhum, → `422`.
+
+- `metodo_preparo`: `cru` \| `cozido` \| `frito`.
+- O de-para (classe + preparo → alimento da TACO) fica em
+  [`data/mapeamento_ia_taco.csv`](data/mapeamento_ia_taco.csv); para suportar uma
+  classe nova do modelo basta adicionar linhas lá (o nome precisa existir em `data/taco.csv`).
+- Fórmula: `nutriente = valor_por_100g × gramas / 100`, 2 casas (meio para cima); o total
+  soma os itens já arredondados.
+- Combinação sem mapeamento → `422`; alimento do de-para ausente em `alimento_taco`
+  (importação não rodada) → `404`.
+
+### Cálculo basal (RF14)
+
+`POST /api/v1/pacientes/{paciente_id}/triagem` recebe os dados da triagem, calcula o
+**Teto Calórico Diário Inicial** e o salva em `pacientes.meta_kcal`
+(`origem_meta = "harris_benedict"`). O paciente precisa estar cadastrado
+(`404` se não estiver); refazer a triagem sobrescreve os dados e gera um novo teto.
+
+**Corpo da requisição** — todos os campos são obrigatórios:
+
+| Campo | Tipo | Regra |
+|---|---|---|
+| `peso_kg` | número | 20 a 250, até 2 casas decimais |
+| `altura_cm` | número | 100 a 250, até 2 casas decimais (**centímetros**, não metros) |
+| `idade` | inteiro | 10 a 120 |
+| `genero` | texto | `masculino` \| `feminino` |
+| `nivel_atividade` | texto | `sedentario` \| `leve` \| `moderado` \| `intenso` \| `muito_intenso` |
+
+**Como o teto é calculado**
+
+1. **TMB** pela equação de Harris-Benedict original (1919), em kcal/dia:
+   - homem: `66,47 + 13,75 × peso + 5,003 × altura − 6,755 × idade`
+   - mulher: `655,1 + 9,563 × peso + 1,850 × altura − 4,676 × idade`
+2. **Teto calórico** = TMB × fator do nível de atividade:
+
+| `nivel_atividade` | Fator |
+|---|---|
+| `sedentario` | 1,2 |
+| `leve` | 1,375 |
+| `moderado` | 1,55 |
+| `intenso` | 1,725 |
+| `muito_intenso` | 1,9 |
+
+Os resultados são arredondados para 2 casas (meio para cima). Os valores devolvidos
+batem entre si: `tmb_kcal × fator_atividade = teto_calorico_kcal`.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/pacientes/1/triagem   -H 'Content-Type: application/json'   -d '{"peso_kg": 80, "altura_cm": 180, "idade": 30, "genero": "masculino", "nivel_atividade": "moderado"}'
+```
+
+```json
+{
+  "paciente_id": 1,
+  "tmb_kcal": 1864.36,
+  "fator_atividade": 1.55,
+  "teto_calorico_kcal": 2889.76,
+  "origem_meta": "harris_benedict"
+}
+```
+
+Dados inválidos devolvem `422`.
+
+### Mecanismo de vinculação (RF15)
+
+Permite o vínculo entre paciente e nutricionista por meio de um código temporário de 6 dígitos:
+
+- `POST /api/v1/linking-code`: Exige autenticação de nutricionista (`Authorization: Bearer <token>`). Gera um código numérico de 6 dígitos que expira conforme `LINKING_CODE_EXPIRE_MINUTES`.
+- `POST /api/v1/link`: Exige autenticação de paciente. Recebe `{"codigo": "123456"}` e cria o vínculo de forma atômica e idempotente.
+
+Depois de resgatar o codigo, o paciente pode chamar `POST /api/v1/link/{nutricionista_id}/aceitar` ou `/recusar`. O status fica `pendente` ate a resposta; as transicoes finais sao `ativo` ou `recusado`. A rota `GET /api/v1/patients?busca=` lista os vinculos ativos do nutricionista autenticado, e `DELETE /api/v1/patients/{paciente_id}` os encerra com status `encerrado`. Vínculos existentes antes da migration `d4e5f6a7b890` sao preservados como `ativo`.
+
+**Comportamento de erro e respostas HTTP:**
+- `401 Unauthorized`: ausência de token, token expirado, assinatura inválida, `sub` ausente ou inválido, ou usuário inexistente.
+- `403 Forbidden`: perfil incompatível (paciente tentando gerar código, nutricionista tentando resgatar, ou paciente tentando resgatar código gerado por ele mesmo).
+- `404 Not Found`: código não encontrado.
+- `409 Conflict`: código já utilizado por outro paciente.
+- `410 Gone`: código expirado.
+- `422 Unprocessable Entity`: formato inválido (ex.: código não numérico ou com tamanho diferente de 6 dígitos).
+
+**Migrations e Integridade Referencial:**
+A migration `9c2f8f2d7d1a` (depois da `4895cf62af9e`, que cria `usuarios` e `nutricionistas`) cria `codigo_vinculacao` e `vinculos` com foreign keys para `nutricionistas.id` e `pacientes.id` (`ON DELETE CASCADE` para vínculos e nutricionistas, `ON DELETE SET NULL` para paciente no histórico de códigos).
+
+### Versionamento e auditoria do plano (RF08, RNF08)
+
+Não existe um "editar plano" separado: o app do nutricionista parte do plano ativo,
+muda o que quiser e chama `POST /api/v1/pacientes/{id}/planos` de novo. Cada chamada:
+
+1. cria a **versão** seguinte (`versao` = maior versão do paciente + 1) e desativa a anterior;
+2. grava em `auditorias` o plano de **antes** (o ativo até então, `null` no primeiro) e o de
+   **depois**, com o autor e o horário. Uma chamada recusada (`403`, `422`...) não cria versão
+   nem auditoria.
+
+`GET /api/v1/pacientes/{id}/planos/versoes` devolve todas as versões, da mais nova para a
+mais antiga. Cada item é o plano completo daquela versão (mesmos campos de `POST /planos`)
+mais `versao` e `autor` (`{id, nome}`, ou `null` se a conta do nutricionista foi removida).
+Lista vazia se o paciente nunca teve plano.
+
+- `401`: sem token ou token inválido.
+- `403`: perfil que não é nutricionista (`Perfil nao autorizado`), ou nutricionista sem vínculo com o paciente (`Sem vinculo com este paciente`).
+- `404`: paciente não encontrado.
+
+A auditoria também registra os **dados clínicos**: cada `POST /pacientes/{id}/triagem` que
+muda peso, altura, idade, gênero, nível de atividade ou a meta calórica grava os valores de
+antes e depois, tendo o paciente como autor. Refazer a triagem com os mesmos valores não
+gera registro. Ainda não há endpoint para consultar a tabela `auditorias`.
+
+### Sincronização em lote de refeições offline (RNF07)
+
+O app grava no aparelho as refeições registradas sem internet e, quando a conexão
+volta, envia todas de uma vez para `POST /api/v1/refeicoes/batch`:
+
+```json
+{ "paciente_id": 7, "refeicoes": [ { "paciente_id": 7, "consumida_em": "2026-10-20T12:30:00Z", "tipo": "almoco", "itens": [ ... ] } ] }
+```
+
+- **Tudo ou nada:** o lote é validado inteiro antes de gravar. Se uma refeição for
+  inválida (ex.: `consumida_em` no futuro), a API responde 422 indicando qual
+  (`refeicoes[2].consumida_em ...`) e nenhuma refeição do lote é gravada.
+- **Deduplicação:** uma refeição com o mesmo paciente, instante, tipo, observação
+  e itens (em qualquer ordem) de uma já gravada não é gravada de novo — inclusive
+  se ela se repetir dentro do próprio lote. Assim, reenviar um lote cuja resposta
+  se perdeu não duplica nada.
+- A resposta (200) traz `criadas`, `duplicadas` e a lista `refeicoes` **na mesma
+  ordem do envio**, cada uma com o `id` (o existente, quando `duplicada: true`)
+  para o app marcar o registro local como sincronizado.
+- Até 500 refeições por lote; só o próprio paciente pode enviar o seu.
+
+### Valores nutricionais
+
+No banco são `numeric(8,2)` e no código `Decimal` — as somas são exatas, sem erro
+de ponto flutuante. **No JSON saem como número** (`193.5`, não `"193.50"`), para
+o app e o painel não precisarem fazer parse de texto em campo numérico.
+
+### Visão geral da carteira
+
+`GET /nutricionista/visao-geral` (painel do nutricionista):
+
+- **adesão semanal**: dos últimos 7 dias locais completos, a porcentagem em que o
+  paciente ficou dentro da meta, com a mesma regra da ofensiva (pelo menos 2
+  refeições e consumo a até 30% da meta);
+- **em risco**: vínculo ativo com alerta de desvio não lido ou sem registro de
+  refeição há 48 h (`motivo_risco` diz qual); entram em `alertas_criticos`;
+- **pendente**: resgatou o código e ainda não aceitou o vínculo. Não traz meta
+  nem consumo, porque o nutricionista ainda não tem acesso aos dados de saúde.
+
+### Fusos horários
+
+Todos os instantes são gravados e devolvidos em **UTC**, sempre com offset no
+JSON. O **dia** (histórico, consumo diário, dashboard, alertas, ofensiva), a
+**semana** do ranking e a sugestão do tipo de refeição usam o fuso oficial
+`APP_TIMEZONE` (padrão `America/Sao_Paulo`, ver `app/core/tempo.py`): um jantar
+às 21h30 em São Paulo é gravado como 00h30 UTC do dia seguinte, mas conta no
+próprio dia.
+
+## Documentação Técnica do Sistema
+
+Para entender a arquitetura completa, integrações e modelagem de dados:
+- [Documento de Arquitetura](../Documentação/ARQUITETURA.md) — Visão C4, fluxos de integração e motor de regras.
+- [Modelagem de Banco de Dados](../Documentação/BANCO_DE_DADOS.md) — DER completo e dicionário de dados.
+
+## Repositórios do projeto
+
+- [Nutri-Vision-Back-end](https://github.com/Gupo-05-6-EG/Nutri-Vision-Back-end) — esta API
+- [Nutri-Vision-Front-end](https://github.com/Gupo-05-6-EG/Nutri-Vision-Front-end) — app Flutter (paciente)
+- [Nutri-Vision-Front-end-Web](https://github.com/Gupo-05-6-EG/Nutri-Vision-Front-end-Web) — painel React (nutricionista)
+- [Nutri-Vision-IA](https://github.com/Gupo-05-6-EG/Nutri-Vision-IA) — reconhecimento de alimentos

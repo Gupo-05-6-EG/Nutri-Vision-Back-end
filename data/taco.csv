@@ -1,0 +1,591 @@
+nome,categoria,kcal_100g,carbs_100g,prot_100g,gord_100g
+"Arroz, integral, cozido",Cereais e derivados,124.00,25.80,2.60,1.00
+"Arroz, integral, cru",Cereais e derivados,360.00,77.50,7.30,1.90
+"Arroz, tipo 1, cozido",Cereais e derivados,128.00,28.10,2.50,0.20
+"Arroz, tipo 1, cru",Cereais e derivados,358.00,78.80,7.20,0.30
+"Arroz, tipo 2, cozido",Cereais e derivados,130.00,28.20,2.60,0.40
+"Arroz, tipo 2, cru",Cereais e derivados,358.00,78.90,7.20,0.30
+"Aveia, flocos, crua",Cereais e derivados,394.00,66.60,13.90,8.50
+"Biscoito, doce, maisena",Cereais e derivados,443.00,75.20,8.10,12.00
+"Biscoito, doce, recheado com chocolate",Cereais e derivados,472.00,70.50,6.40,19.60
+"Biscoito, doce, recheado com morango",Cereais e derivados,471.00,71.00,5.70,19.60
+"Biscoito, doce, wafer, recheado de chocolate",Cereais e derivados,502.00,67.50,5.60,24.70
+"Biscoito, doce, wafer, recheado de morango",Cereais e derivados,513.00,67.40,4.50,26.40
+"Biscoito, salgado, cream cracker",Cereais e derivados,432.00,68.70,10.10,14.40
+"Bolo, mistura para",Cereais e derivados,419.00,84.70,6.20,6.10
+"Bolo, pronto, aipim",Cereais e derivados,324.00,47.90,4.40,12.70
+"Bolo, pronto, chocolate",Cereais e derivados,410.00,54.70,6.20,18.50
+"Bolo, pronto, coco",Cereais e derivados,333.00,52.30,5.70,11.30
+"Bolo, pronto, milho",Cereais e derivados,311.00,45.10,4.80,12.40
+"Canjica, branca, crua",Cereais e derivados,358.00,78.10,7.20,1.00
+"Canjica, com leite integral",Cereais e derivados,112.00,23.60,2.40,1.20
+"Cereais, milho, flocos, com sal",Cereais e derivados,370.00,80.80,7.30,1.60
+"Cereais, milho, flocos, sem sal",Cereais e derivados,363.00,80.40,6.90,1.20
+"Cereais, mingau, milho, infantil",Cereais e derivados,394.00,87.30,6.40,1.10
+"Cereais, mistura para vitamina, trigo, cevada e aveia",Cereais e derivados,381.00,81.60,8.90,2.10
+"Cereal matinal, milho",Cereais e derivados,365.00,83.80,7.20,1.00
+"Cereal matinal, milho, açúcar",Cereais e derivados,377.00,88.80,4.70,0.70
+"Creme de arroz, pó",Cereais e derivados,386.00,83.90,7.00,1.20
+"Creme de milho, pó",Cereais e derivados,333.00,86.10,4.80,1.60
+"Curau, milho verde",Cereais e derivados,78.00,13.90,2.40,1.60
+"Curau, milho verde, mistura para",Cereais e derivados,402.00,79.80,2.20,13.40
+"Farinha, de arroz, enriquecida",Cereais e derivados,363.00,85.50,1.30,0.30
+"Farinha, de centeio, integral",Cereais e derivados,336.00,73.30,12.50,1.80
+"Farinha, de milho, amarela",Cereais e derivados,351.00,79.10,7.20,1.50
+"Farinha, de rosca",Cereais e derivados,371.00,75.80,11.40,1.50
+"Farinha, de trigo",Cereais e derivados,360.00,75.10,9.80,1.40
+"Farinha, láctea, de cereais",Cereais e derivados,415.00,77.80,11.90,5.80
+"Lasanha, massa fresca, cozida",Cereais e derivados,164.00,32.50,5.80,1.20
+"Lasanha, massa fresca, crua",Cereais e derivados,220.00,45.10,7.00,1.30
+"Macarrão, instantâneo",Cereais e derivados,436.00,62.40,8.80,17.20
+"Macarrão, trigo, cru",Cereais e derivados,371.00,77.90,10.00,1.30
+"Macarrão, trigo, cru, com ovos",Cereais e derivados,371.00,76.60,10.30,2.00
+"Milho, amido, cru",Cereais e derivados,361.00,87.10,0.60,0.00
+"Milho, fubá, cru",Cereais e derivados,353.00,78.90,7.20,1.90
+"Milho, verde, cru",Cereais e derivados,138.00,28.60,6.60,0.60
+"Milho, verde, enlatado, drenado",Cereais e derivados,98.00,17.10,3.20,2.40
+"Mingau tradicional, pó",Cereais e derivados,373.00,89.30,0.60,0.40
+"Pamonha, barra para cozimento, pré-cozida",Cereais e derivados,171.00,30.70,2.60,4.80
+"Pão, aveia, forma",Cereais e derivados,343.00,59.60,12.40,5.70
+"Pão, de soja",Cereais e derivados,309.00,56.50,11.30,3.60
+"Pão, glúten, forma",Cereais e derivados,253.00,44.10,12.00,2.70
+"Pão, milho, forma",Cereais e derivados,292.00,56.40,8.30,3.10
+"Pão, trigo, forma, integral",Cereais e derivados,253.00,49.90,9.40,3.70
+"Pão, trigo, francês",Cereais e derivados,300.00,58.60,8.00,3.10
+"Pão, trigo, sovado",Cereais e derivados,311.00,61.50,8.40,2.80
+"Pastel, de carne, cru",Cereais e derivados,289.00,42.00,10.70,8.80
+"Pastel, de carne, frito",Cereais e derivados,388.00,43.80,10.10,20.10
+"Pastel, de queijo, cru",Cereais e derivados,308.00,45.90,9.90,9.60
+"Pastel, de queijo, frito",Cereais e derivados,422.00,48.10,8.70,22.70
+"Pastel, massa, crua",Cereais e derivados,310.00,57.40,6.90,5.50
+"Pastel, massa, frita",Cereais e derivados,570.00,49.30,6.00,40.90
+"Pipoca, com óleo de soja, sem sal",Cereais e derivados,448.00,70.30,9.90,15.90
+"Polenta, pré-cozida",Cereais e derivados,103.00,23.30,2.30,0.30
+"Torrada, pão francês",Cereais e derivados,377.00,74.60,10.50,3.30
+"Abóbora, cabotian, cozida","Verduras, hortaliças e derivados",48.00,10.80,1.40,0.70
+"Abóbora, cabotian, crua","Verduras, hortaliças e derivados",39.00,8.40,1.70,0.50
+"Abóbora, menina brasileira, crua","Verduras, hortaliças e derivados",14.00,3.30,0.60,0.00
+"Abóbora, moranga, crua","Verduras, hortaliças e derivados",12.00,2.70,1.00,0.10
+"Abóbora, moranga, refogada","Verduras, hortaliças e derivados",29.00,6.00,0.40,0.80
+"Abóbora, pescoço, crua","Verduras, hortaliças e derivados",24.00,6.10,0.70,0.10
+"Abobrinha, italiana, cozida","Verduras, hortaliças e derivados",15.00,3.00,1.10,0.20
+"Abobrinha, italiana, crua","Verduras, hortaliças e derivados",19.00,4.30,1.10,0.10
+"Abobrinha, italiana, refogada","Verduras, hortaliças e derivados",24.00,4.20,1.10,0.80
+"Abobrinha, paulista, crua","Verduras, hortaliças e derivados",31.00,7.90,0.60,0.10
+"Acelga, crua","Verduras, hortaliças e derivados",21.00,4.60,1.40,0.10
+"Agrião, cru","Verduras, hortaliças e derivados",17.00,2.30,2.70,0.20
+"Aipo, cru","Verduras, hortaliças e derivados",19.00,4.30,0.80,0.10
+"Alface, americana, crua","Verduras, hortaliças e derivados",9.00,1.70,0.60,0.10
+"Alface, crespa, crua","Verduras, hortaliças e derivados",11.00,1.70,1.30,0.20
+"Alface, lisa, crua","Verduras, hortaliças e derivados",14.00,2.40,1.70,0.10
+"Alface, roxa, crua","Verduras, hortaliças e derivados",13.00,2.50,0.90,0.20
+"Alfavaca, crua","Verduras, hortaliças e derivados",29.00,5.20,2.70,0.50
+"Alho, cru","Verduras, hortaliças e derivados",113.00,23.90,7.00,0.20
+"Alho-poró, cru","Verduras, hortaliças e derivados",32.00,6.90,1.40,0.10
+"Almeirão, cru","Verduras, hortaliças e derivados",18.00,3.30,1.80,0.20
+"Almeirão, refogado","Verduras, hortaliças e derivados",65.00,5.70,1.70,4.80
+"Batata, baroa, cozida","Verduras, hortaliças e derivados",80.00,18.90,0.90,0.20
+"Batata, baroa, crua","Verduras, hortaliças e derivados",101.00,24.00,1.00,0.20
+"Batata, doce, cozida","Verduras, hortaliças e derivados",77.00,18.40,0.60,0.10
+"Batata, doce, crua","Verduras, hortaliças e derivados",118.00,28.20,1.30,0.10
+"Batata, frita, tipo chips, industrializada","Verduras, hortaliças e derivados",543.00,51.20,5.60,36.60
+"Batata, inglesa, cozida","Verduras, hortaliças e derivados",52.00,11.90,1.20,0.00
+"Batata, inglesa, crua","Verduras, hortaliças e derivados",64.00,14.70,1.80,0.00
+"Batata, inglesa, frita","Verduras, hortaliças e derivados",267.00,35.60,5.00,13.10
+"Batata, inglesa, sauté","Verduras, hortaliças e derivados",68.00,14.10,1.30,0.90
+"Berinjela, cozida","Verduras, hortaliças e derivados",19.00,4.50,0.70,0.10
+"Berinjela, crua","Verduras, hortaliças e derivados",20.00,4.40,1.20,0.10
+"Beterraba, cozida","Verduras, hortaliças e derivados",32.00,7.20,1.30,0.10
+"Beterraba, crua","Verduras, hortaliças e derivados",49.00,11.10,1.90,0.10
+"Biscoito, polvilho doce","Verduras, hortaliças e derivados",438.00,80.50,1.30,12.20
+"Brócolis, cozido","Verduras, hortaliças e derivados",25.00,4.40,2.10,0.50
+"Brócolis, cru","Verduras, hortaliças e derivados",25.00,4.00,3.60,0.30
+"Cará, cozido","Verduras, hortaliças e derivados",78.00,18.90,1.50,0.10
+"Cará, cru","Verduras, hortaliças e derivados",96.00,23.00,2.30,0.10
+"Caruru, cru","Verduras, hortaliças e derivados",34.00,6.00,3.20,0.60
+"Catalonha, crua","Verduras, hortaliças e derivados",24.00,4.80,1.90,0.30
+"Catalonha, refogada","Verduras, hortaliças e derivados",63.00,4.80,2.00,4.80
+"Cebola, crua","Verduras, hortaliças e derivados",39.00,8.90,1.70,0.10
+"Cebolinha, crua","Verduras, hortaliças e derivados",20.00,3.40,1.90,0.40
+"Cenoura, cozida","Verduras, hortaliças e derivados",30.00,6.70,0.80,0.20
+"Cenoura, crua","Verduras, hortaliças e derivados",34.00,7.70,1.30,0.20
+"Chicória, crua","Verduras, hortaliças e derivados",14.00,2.90,1.10,0.10
+"Chuchu, cozido","Verduras, hortaliças e derivados",19.00,4.80,0.40,0.00
+"Chuchu, cru","Verduras, hortaliças e derivados",17.00,4.10,0.70,0.10
+"Coentro, folhas desidratadas","Verduras, hortaliças e derivados",309.00,48.00,20.90,10.40
+"Couve, manteiga, crua","Verduras, hortaliças e derivados",27.00,4.30,2.90,0.50
+"Couve, manteiga, refogada ","Verduras, hortaliças e derivados",90.00,8.70,1.70,6.60
+"Couve-flor, crua","Verduras, hortaliças e derivados",23.00,4.50,1.90,0.20
+"Couve-flor, cozida","Verduras, hortaliças e derivados",19.00,3.90,1.20,0.30
+"Espinafre, Nova Zelândia, cru","Verduras, hortaliças e derivados",16.00,2.60,2.00,0.20
+"Espinafre, Nova Zelândia, refogado","Verduras, hortaliças e derivados",67.00,4.20,2.70,5.40
+"Farinha, de mandioca, crua","Verduras, hortaliças e derivados",361.00,87.90,1.60,0.30
+"Farinha, de mandioca, torrada","Verduras, hortaliças e derivados",365.00,89.20,1.20,0.30
+"Farinha, de puba","Verduras, hortaliças e derivados",360.00,87.30,1.60,0.50
+"Fécula, de mandioca","Verduras, hortaliças e derivados",331.00,81.10,0.50,0.30
+"Feijão, broto, cru","Verduras, hortaliças e derivados",39.00,7.80,4.20,0.10
+"Inhame, cru","Verduras, hortaliças e derivados",97.00,23.20,2.10,0.20
+"Jiló, cru","Verduras, hortaliças e derivados",27.00,6.20,1.40,0.20
+"Jurubeba, crua","Verduras, hortaliças e derivados",126.00,23.10,4.40,3.90
+"Mandioca, cozida","Verduras, hortaliças e derivados",125.00,30.10,0.60,0.30
+"Mandioca, crua","Verduras, hortaliças e derivados",151.00,36.20,1.10,0.30
+"Mandioca, farofa, temperada","Verduras, hortaliças e derivados",406.00,80.30,2.10,9.10
+"Mandioca, frita","Verduras, hortaliças e derivados",300.00,50.30,1.40,11.20
+"Manjericão, cru","Verduras, hortaliças e derivados",21.00,3.60,2.00,0.40
+"Maxixe, cru","Verduras, hortaliças e derivados",14.00,2.70,1.40,0.10
+"Mostarda, folha, crua","Verduras, hortaliças e derivados",18.00,3.20,2.10,0.20
+"Nhoque, batata, cozido","Verduras, hortaliças e derivados",181.00,36.80,5.90,1.90
+"Nabo, cru","Verduras, hortaliças e derivados",18.00,4.10,1.20,0.10
+"Palmito, juçara, em conserva","Verduras, hortaliças e derivados",23.00,4.30,1.80,0.40
+"Palmito, pupunha, em conserva","Verduras, hortaliças e derivados",29.00,5.50,2.50,0.50
+"Pão, de queijo, assado","Verduras, hortaliças e derivados",363.00,34.20,5.10,24.60
+"Pão, de queijo, cru","Verduras, hortaliças e derivados",295.00,38.50,3.60,14.00
+"Pepino, cru","Verduras, hortaliças e derivados",10.00,2.00,0.90,0.00
+"Pimentão, amarelo, cru","Verduras, hortaliças e derivados",28.00,6.00,1.20,0.40
+"Pimentão, verde, cru","Verduras, hortaliças e derivados",21.00,4.90,1.10,0.20
+"Pimentão, vermelho, cru","Verduras, hortaliças e derivados",23.00,5.50,1.00,0.10
+"Polvilho, doce","Verduras, hortaliças e derivados",351.00,86.80,0.40,0.00
+"Quiabo, cru","Verduras, hortaliças e derivados",30.00,6.40,1.90,0.30
+"Rabanete, cru","Verduras, hortaliças e derivados",14.00,2.70,1.40,0.10
+"Repolho, branco, cru","Verduras, hortaliças e derivados",17.00,3.90,0.90,0.10
+"Repolho, roxo, cru","Verduras, hortaliças e derivados",31.00,7.20,1.90,0.10
+"Repolho, roxo, refogado","Verduras, hortaliças e derivados",42.00,7.60,1.80,1.20
+"Rúcula, crua","Verduras, hortaliças e derivados",13.00,2.20,1.80,0.10
+"Salsa, crua","Verduras, hortaliças e derivados",33.00,5.70,3.30,0.60
+"Seleta de legumes, enlatada","Verduras, hortaliças e derivados",57.00,12.70,3.40,0.40
+"Serralha, crua","Verduras, hortaliças e derivados",30.00,4.90,2.70,0.70
+"Taioba, crua","Verduras, hortaliças e derivados",34.00,5.40,2.90,0.90
+"Tomate, com semente, cru","Verduras, hortaliças e derivados",15.00,3.10,1.10,0.20
+"Tomate, extrato","Verduras, hortaliças e derivados",61.00,15.00,2.40,0.20
+"Tomate, molho industrializado","Verduras, hortaliças e derivados",38.00,7.70,1.40,0.90
+"Tomate, purê","Verduras, hortaliças e derivados",28.00,6.90,1.40,0.00
+"Tomate, salada","Verduras, hortaliças e derivados",21.00,5.10,0.80,0.00
+"Vagem, crua","Verduras, hortaliças e derivados",25.00,5.30,1.80,0.20
+"Abacate, cru",Frutas e derivados,96.00,6.00,1.20,8.40
+"Abacaxi, cru",Frutas e derivados,48.00,12.30,0.90,0.10
+"Abacaxi, polpa, congelada",Frutas e derivados,31.00,7.80,0.50,0.10
+"Abiu, cru",Frutas e derivados,62.00,14.90,0.80,0.70
+"Açaí, polpa, com xarope de guaraná e glucose",Frutas e derivados,110.00,21.50,0.70,3.70
+"Açaí, polpa, congelada",Frutas e derivados,58.00,6.20,0.80,3.90
+"Acerola, crua",Frutas e derivados,33.00,8.00,0.90,0.20
+"Acerola, polpa, congelada",Frutas e derivados,22.00,5.50,0.60,0.00
+"Ameixa, calda, enlatada ",Frutas e derivados,183.00,46.90,0.40,0.00
+"Ameixa, crua",Frutas e derivados,53.00,13.90,0.80,0.00
+"Ameixa, em calda, enlatada, drenada ",Frutas e derivados,177.00,47.70,1.00,0.30
+"Atemóia, crua",Frutas e derivados,97.00,25.30,1.00,0.30
+"Banana, da terra, crua",Frutas e derivados,128.00,33.70,1.40,0.20
+"Banana, doce em barra",Frutas e derivados,280.00,75.70,2.20,0.10
+"Banana, figo, crua",Frutas e derivados,105.00,27.80,1.10,0.10
+"Banana, maçã, crua",Frutas e derivados,87.00,22.30,1.80,0.10
+"Banana, nanica, crua",Frutas e derivados,92.00,23.80,1.40,0.10
+"Banana, ouro, crua",Frutas e derivados,112.00,29.30,1.50,0.20
+"Banana, pacova, crua",Frutas e derivados,78.00,20.30,1.20,0.10
+"Banana, prata, crua",Frutas e derivados,98.00,26.00,1.30,0.10
+"Cacau, cru",Frutas e derivados,74.00,19.40,1.00,0.10
+"Cajá-Manga, cru",Frutas e derivados,46.00,11.40,1.30,0.00
+"Cajá, polpa, congelada",Frutas e derivados,26.00,6.40,0.60,0.20
+"Caju, cru",Frutas e derivados,43.00,10.30,1.00,0.30
+"Caju, polpa, congelada",Frutas e derivados,37.00,9.40,0.50,0.20
+"Caju, suco concentrado, envasado",Frutas e derivados,45.00,10.70,0.40,0.20
+"Caqui, chocolate, cru",Frutas e derivados,71.00,19.30,0.40,0.10
+"Carambola, crua",Frutas e derivados,46.00,11.50,0.90,0.20
+"Ciriguela, crua",Frutas e derivados,76.00,18.90,1.40,0.40
+"Cupuaçu, cru",Frutas e derivados,49.00,10.40,1.20,1.00
+"Cupuaçu, polpa, congelada",Frutas e derivados,49.00,11.40,0.80,0.60
+"Figo, cru",Frutas e derivados,41.00,10.20,1.00,0.20
+"Figo, enlatado, em calda",Frutas e derivados,184.00,50.30,0.60,0.20
+"Fruta-pão, crua",Frutas e derivados,67.00,17.20,1.10,0.20
+"Goiaba, branca, com casca, crua",Frutas e derivados,52.00,12.40,0.90,0.50
+"Goiaba, doce em pasta",Frutas e derivados,269.00,74.10,0.60,0.00
+"Goiaba, doce, cascão",Frutas e derivados,286.00,78.70,0.40,0.10
+"Goiaba, vermelha, com casca, crua",Frutas e derivados,54.00,13.00,1.10,0.40
+"Graviola, crua",Frutas e derivados,62.00,15.80,0.80,0.20
+"Graviola, polpa, congelada",Frutas e derivados,38.00,9.80,0.60,0.10
+"Jabuticaba, crua",Frutas e derivados,58.00,15.30,0.60,0.10
+"Jaca, crua",Frutas e derivados,88.00,22.50,1.40,0.30
+"Jambo, cru",Frutas e derivados,27.00,6.50,0.90,0.10
+"Jamelão, cru",Frutas e derivados,41.00,10.60,0.50,0.10
+"Kiwi, cru",Frutas e derivados,51.00,11.50,1.30,0.60
+"Laranja, baía, crua",Frutas e derivados,45.00,11.50,1.00,0.10
+"Laranja, baía, suco",Frutas e derivados,37.00,8.70,0.70,0.00
+"Laranja, da terra, crua",Frutas e derivados,51.00,12.90,1.10,0.20
+"Laranja, da terra, suco",Frutas e derivados,41.00,9.60,0.70,0.10
+"Laranja, lima, crua",Frutas e derivados,46.00,11.50,1.10,0.10
+"Laranja, lima, suco",Frutas e derivados,39.00,9.20,0.70,0.10
+"Laranja, pêra, crua",Frutas e derivados,37.00,8.90,1.00,0.10
+"Laranja, pêra, suco",Frutas e derivados,33.00,7.60,0.70,0.10
+"Laranja, valência, crua",Frutas e derivados,46.00,11.70,0.80,0.20
+"Laranja, valência, suco",Frutas e derivados,36.00,8.60,0.50,0.10
+"Limão, cravo, suco",Frutas e derivados,14.00,5.20,0.30,0.00
+"Limão, galego, suco",Frutas e derivados,22.00,7.30,0.60,0.10
+"Limão, tahiti, cru",Frutas e derivados,32.00,11.10,0.90,0.10
+"Maçã, Argentina, com casca, crua",Frutas e derivados,63.00,16.60,0.20,0.20
+"Maçã, Fuji, com casca, crua",Frutas e derivados,56.00,15.20,0.30,0.00
+"Macaúba, crua",Frutas e derivados,404.00,13.90,2.10,40.70
+" Mamão, doce em calda, drenado",Frutas e derivados,196.00,54.00,0.20,0.10
+"Mamão, Formosa, cru",Frutas e derivados,45.00,11.60,0.80,0.10
+"Mamão, Papaia, cru",Frutas e derivados,40.00,10.40,0.50,0.10
+" Mamão verde, doce em calda, drenado",Frutas e derivados,209.00,57.60,0.30,0.10
+"Manga, Haden, crua",Frutas e derivados,64.00,16.70,0.40,0.30
+"Manga, Palmer, crua",Frutas e derivados,72.00,19.40,0.40,0.20
+"Manga, polpa, congelada",Frutas e derivados,48.00,12.50,0.40,0.20
+"Manga, Tommy Atkins, crua",Frutas e derivados,51.00,12.80,0.90,0.20
+"Maracujá, cru",Frutas e derivados,68.00,12.30,2.00,2.10
+"Maracujá, polpa, congelada",Frutas e derivados,39.00,9.60,0.80,0.20
+"Maracujá, suco concentrado, envasado",Frutas e derivados,42.00,9.60,0.80,0.20
+"Melancia, crua",Frutas e derivados,33.00,8.10,0.90,0.00
+"Melão, cru",Frutas e derivados,29.00,7.50,0.70,0.00
+"Mexerica, Murcote, crua",Frutas e derivados,58.00,14.90,0.90,0.10
+"Mexerica, Rio, crua",Frutas e derivados,37.00,9.30,0.70,0.10
+"Morango, cru",Frutas e derivados,30.00,6.80,0.90,0.30
+"Nêspera, crua",Frutas e derivados,43.00,11.50,0.30,0.00
+"Pequi, cru",Frutas e derivados,205.00,13.00,2.30,18.00
+"Pêra, Park, crua",Frutas e derivados,61.00,16.10,0.20,0.20
+"Pêra, Williams, crua",Frutas e derivados,53.00,14.00,0.60,0.10
+"Pêssego, Aurora, cru",Frutas e derivados,36.00,9.30,0.80,0.00
+"Pêssego, enlatado, em calda",Frutas e derivados,63.00,16.90,0.70,0.00
+"Pinha, crua",Frutas e derivados,88.00,22.40,1.50,0.30
+"Pitanga, crua",Frutas e derivados,41.00,10.20,0.90,0.20
+"Pitanga, polpa, congelada",Frutas e derivados,19.00,4.80,0.30,0.10
+"Romã, crua",Frutas e derivados,56.00,15.10,0.40,0.00
+"Tamarindo, cru",Frutas e derivados,276.00,72.50,3.20,0.50
+"Tangerina, Poncã, crua",Frutas e derivados,38.00,9.60,0.80,0.10
+"Tangerina, Poncã, suco",Frutas e derivados,36.00,8.80,0.50,0.00
+"Tucumã, cru",Frutas e derivados,262.00,26.50,2.10,19.10
+"Umbu, cru",Frutas e derivados,37.00,9.40,0.80,0.00
+"Umbu, polpa, congelada",Frutas e derivados,34.00,8.80,0.50,0.10
+"Uva, Itália, crua",Frutas e derivados,53.00,13.60,0.70,0.20
+"Uva, Rubi, crua",Frutas e derivados,49.00,12.70,0.60,0.20
+"Uva, suco concentrado, envasado",Frutas e derivados,58.00,14.70,0.00,0.00
+"Azeite, de dendê",Gorduras e óleos,884.00,0.00,0.00,100.00
+"Azeite, de oliva, extra virgem",Gorduras e óleos,884.00,0.00,0.00,100.00
+"Manteiga, com sal",Gorduras e óleos,726.00,0.10,0.40,82.40
+"Manteiga, sem sal",Gorduras e óleos,758.00,0.00,0.40,86.00
+"Margarina, com óleo hidrogenado, com sal (65% de lipídeos)",Gorduras e óleos,596.00,0.00,0.00,67.40
+"Margarina, com óleo hidrogenado, sem sal (80% de lipídeos)",Gorduras e óleos,723.00,0.00,0.00,81.70
+"Margarina, com óleo interesterificado, com sal (65%de lipídeos)",Gorduras e óleos,594.00,0.00,0.00,67.20
+"Margarina, com óleo interesterificado, sem sal (65% de lipídeos)",Gorduras e óleos,593.00,0.00,0.00,67.10
+"Óleo, de babaçu",Gorduras e óleos,884.00,0.00,0.00,100.00
+"Óleo, de canola",Gorduras e óleos,884.00,0.00,0.00,100.00
+"Óleo, de girassol",Gorduras e óleos,884.00,0.00,0.00,100.00
+"Óleo, de milho",Gorduras e óleos,884.00,0.00,0.00,100.00
+"Óleo, de pequi",Gorduras e óleos,884.00,0.00,0.00,100.00
+"Óleo, de soja",Gorduras e óleos,884.00,0.00,0.00,100.00
+"Abadejo, filé, congelado, assado",Pescados e frutos do mar,112.00,0.00,23.50,1.20
+"Abadejo, filé, congelado,cozido",Pescados e frutos do mar,91.00,0.00,19.30,0.90
+"Abadejo, filé, congelado, cru",Pescados e frutos do mar,59.00,0.00,13.10,0.40
+"Abadejo, filé, congelado, grelhado",Pescados e frutos do mar,130.00,0.00,27.60,1.30
+"Atum, conserva em óleo",Pescados e frutos do mar,166.00,0.00,26.20,6.00
+"Atum, fresco, cru",Pescados e frutos do mar,118.00,0.00,25.70,0.90
+"Bacalhau, salgado, cru",Pescados e frutos do mar,136.00,0.00,29.00,1.30
+"Bacalhau, salgado, refogado",Pescados e frutos do mar,140.00,1.20,24.00,3.60
+"Cação, posta, com farinha de trigo, frita",Pescados e frutos do mar,208.00,3.10,25.00,10.00
+"Cação, posta, cozida",Pescados e frutos do mar,116.00,0.00,25.60,0.70
+"Cação, posta, crua",Pescados e frutos do mar,83.00,0.00,17.90,0.80
+"Camarão, Rio Grande, grande, cozido",Pescados e frutos do mar,90.00,0.00,19.00,1.00
+"Camarão, Rio Grande, grande, cru",Pescados e frutos do mar,47.00,0.00,10.00,0.50
+"Camarão, Sete Barbas, sem cabeça, com casca, frito",Pescados e frutos do mar,231.00,2.90,18.40,15.60
+"Caranguejo, cozido",Pescados e frutos do mar,83.00,0.00,18.50,0.40
+"Corimba, cru",Pescados e frutos do mar,128.00,0.00,17.40,6.00
+"Corimbatá, assado",Pescados e frutos do mar,261.00,0.00,19.90,19.60
+"Corimbatá, cozido",Pescados e frutos do mar,239.00,0.00,20.10,16.90
+"Corvina de água doce, crua",Pescados e frutos do mar,101.00,0.00,18.90,2.20
+"Corvina do mar, crua",Pescados e frutos do mar,94.00,0.00,18.60,1.60
+"Corvina grande, assada",Pescados e frutos do mar,147.00,0.00,26.80,3.60
+"Corvina grande, cozida",Pescados e frutos do mar,100.00,0.00,23.40,2.60
+"Dourada de água doce, fresca",Pescados e frutos do mar,131.00,0.00,18.80,5.60
+"Lambari, congelado, cru",Pescados e frutos do mar,131.00,0.00,16.80,6.50
+"Lambari, congelado, frito",Pescados e frutos do mar,327.00,0.00,28.40,22.80
+"Lambari, fresco, cru",Pescados e frutos do mar,152.00,0.00,15.70,9.40
+"Manjuba, com farinha de trigo, frita",Pescados e frutos do mar,344.00,10.20,23.50,22.60
+"Manjuba, frita",Pescados e frutos do mar,349.00,0.00,30.10,24.50
+"Merluza, filé, assado",Pescados e frutos do mar,122.00,0.00,26.60,0.90
+"Merluza, filé, cru",Pescados e frutos do mar,89.00,0.00,16.60,2.00
+"Merluza, filé, frito",Pescados e frutos do mar,192.00,0.00,26.90,8.50
+"Pescada, branca, crua",Pescados e frutos do mar,111.00,0.00,16.30,4.60
+"Pescada, branca, frita",Pescados e frutos do mar,223.00,0.00,27.40,11.80
+"Pescada, filé, com farinha de trigo, frito",Pescados e frutos do mar,283.00,5.00,21.40,19.10
+"Pescada, filé, cru",Pescados e frutos do mar,107.00,0.00,16.70,4.00
+"Pescada, filé, frito",Pescados e frutos do mar,154.00,0.00,28.60,3.60
+"Pescada, filé, molho escabeche",Pescados e frutos do mar,142.00,5.00,11.80,8.00
+"Pescadinha, crua",Pescados e frutos do mar,76.00,0.00,15.50,1.10
+"Pintado, assado",Pescados e frutos do mar,192.00,0.00,36.50,4.00
+"Pintado, cru",Pescados e frutos do mar,91.00,0.00,18.60,1.30
+"Pintado, grelhado",Pescados e frutos do mar,152.00,0.00,30.80,2.30
+"Porquinho, cru",Pescados e frutos do mar,93.00,0.00,20.50,0.60
+"Salmão, filé, com pele, fresco,  grelhado",Pescados e frutos do mar,229.00,0.00,23.90,14.00
+"Salmão, sem pele, fresco, cru",Pescados e frutos do mar,170.00,0.00,19.30,9.70
+"Salmão, sem pele, fresco, grelhado",Pescados e frutos do mar,243.00,0.00,26.10,14.50
+"Sardinha, assada",Pescados e frutos do mar,164.00,0.00,32.20,3.00
+"Sardinha, conserva em óleo",Pescados e frutos do mar,285.00,0.00,15.90,24.00
+"Sardinha, frita",Pescados e frutos do mar,257.00,0.00,33.40,12.70
+"Sardinha, inteira, crua",Pescados e frutos do mar,114.00,0.00,21.10,2.70
+"Tucunaré, filé, congelado, cru",Pescados e frutos do mar,88.00,0.00,18.00,1.20
+Apresuntado,Carnes e derivados,129.00,2.90,13.50,6.70
+"Caldo de carne, tablete",Carnes e derivados,241.00,15.10,7.80,16.60
+"Caldo de galinha, tablete",Carnes e derivados,251.00,10.60,6.30,20.40
+"Carne, bovina, acém, moído, cozido",Carnes e derivados,212.00,0.00,26.70,10.90
+"Carne, bovina, acém, moído, cru",Carnes e derivados,137.00,0.00,19.40,5.90
+"Carne, bovina, acém, sem gordura, cozido",Carnes e derivados,215.00,0.00,27.30,10.90
+"Carne, bovina, acém, sem gordura, cru",Carnes e derivados,144.00,0.00,20.80,6.10
+"Carne, bovina, almôndegas, cruas",Carnes e derivados,189.00,9.80,12.30,11.20
+"Carne, bovina, almôndegas, fritas",Carnes e derivados,272.00,14.30,18.20,15.80
+"Carne, bovina, bucho, cozido",Carnes e derivados,133.00,0.00,21.60,4.50
+"Carne, bovina, bucho, cru",Carnes e derivados,137.00,0.00,20.50,5.50
+"Carne, bovina, capa de contra-filé, com gordura, crua",Carnes e derivados,217.00,0.00,19.20,15.00
+"Carne, bovina, capa de contra-filé, com gordura, grelhada",Carnes e derivados,312.00,0.00,30.70,20.00
+"Carne, bovina, capa de contra-filé, sem gordura, crua",Carnes e derivados,131.00,0.00,21.50,4.30
+"Carne, bovina, capa de contra-filé, sem gordura, grelhada",Carnes e derivados,239.00,0.00,35.10,10.00
+"Carne, bovina, charque, cozido",Carnes e derivados,263.00,0.00,36.40,11.90
+"Carne, bovina, charque, cru",Carnes e derivados,249.00,0.00,22.70,16.80
+"Carne, bovina, contra-filé, à milanesa",Carnes e derivados,352.00,12.20,20.60,24.00
+"Carne, bovina, contra-filé de costela, cru",Carnes e derivados,202.00,0.00,19.80,13.10
+"Carne, bovina, contra-filé de costela, grelhado",Carnes e derivados,275.00,0.00,29.90,16.30
+"Carne, bovina, contra-filé, com gordura, cru",Carnes e derivados,206.00,0.00,21.20,12.80
+"Carne, bovina, contra-filé, com gordura, grelhado",Carnes e derivados,278.00,0.00,32.40,15.50
+"Carne, bovina, contra-filé, sem gordura, cru",Carnes e derivados,157.00,0.00,24.00,6.00
+"Carne, bovina, contra-filé, sem gordura, grelhado",Carnes e derivados,194.00,0.00,35.90,4.50
+"Carne, bovina, costela, assada",Carnes e derivados,373.00,0.00,28.80,27.70
+"Carne, bovina, costela, crua",Carnes e derivados,358.00,0.00,16.70,31.80
+"Carne, bovina, coxão duro, sem gordura, cozido",Carnes e derivados,217.00,0.00,31.90,8.90
+"Carne, bovina, coxão duro, sem gordura, cru",Carnes e derivados,148.00,0.00,21.50,6.20
+"Carne, bovina, coxão mole, sem gordura, cozido",Carnes e derivados,219.00,0.00,32.40,8.90
+"Carne, bovina, coxão mole, sem gordura, cru",Carnes e derivados,169.00,0.00,21.20,8.70
+"Carne, bovina, cupim, assado",Carnes e derivados,330.00,0.00,28.60,23.00
+"Carne, bovina, cupim, cru",Carnes e derivados,221.00,0.00,19.50,15.30
+"Carne, bovina, fígado, cru",Carnes e derivados,141.00,1.10,20.70,5.40
+"Carne, bovina, fígado, grelhado",Carnes e derivados,225.00,4.20,29.90,9.00
+"Carne, bovina, filé mingnon, sem gordura, cru",Carnes e derivados,143.00,0.00,21.60,5.60
+"Carne, bovina, filé mingnon, sem gordura, grelhado",Carnes e derivados,220.00,0.00,32.80,8.80
+"Carne, bovina, flanco, sem gordura, cozido",Carnes e derivados,196.00,0.00,29.40,7.80
+"Carne, bovina, flanco, sem gordura, cru",Carnes e derivados,141.00,0.00,20.00,6.20
+"Carne, bovina, fraldinha, com gordura, cozida",Carnes e derivados,338.00,0.00,24.20,26.00
+"Carne, bovina, fraldinha, com gordura, crua",Carnes e derivados,221.00,0.00,17.60,16.10
+"Carne, bovina, lagarto, cozido",Carnes e derivados,222.00,0.00,32.90,9.10
+"Carne, bovina, lagarto, cru",Carnes e derivados,135.00,0.00,20.50,5.20
+"Carne, bovina, língua, cozida",Carnes e derivados,315.00,0.00,21.40,24.80
+"Carne, bovina, língua, crua",Carnes e derivados,215.00,0.00,17.10,15.80
+"Carne, bovina, maminha, crua",Carnes e derivados,153.00,0.00,20.90,7.00
+"Carne, bovina, maminha, grelhada",Carnes e derivados,153.00,0.00,30.70,2.40
+"Carne, bovina, miolo de alcatra, sem gordura, cru",Carnes e derivados,163.00,0.00,21.60,7.80
+"Carne, bovina, miolo de alcatra, sem gordura, grelhado",Carnes e derivados,241.00,0.00,31.90,11.60
+"Carne, bovina, músculo, sem gordura, cozido",Carnes e derivados,194.00,0.00,31.20,6.70
+"Carne, bovina, músculo, sem gordura, cru",Carnes e derivados,142.00,0.00,21.60,5.50
+"Carne, bovina, paleta, com gordura, crua",Carnes e derivados,159.00,0.00,21.40,7.50
+"Carne, bovina, paleta, sem gordura, cozida",Carnes e derivados,194.00,0.00,29.70,7.40
+"Carne, bovina, paleta, sem gordura, crua",Carnes e derivados,141.00,0.00,21.00,5.70
+"Carne, bovina, patinho, sem gordura, cru",Carnes e derivados,133.00,0.00,21.70,4.50
+"Carne, bovina, patinho, sem gordura, grelhado",Carnes e derivados,219.00,0.00,35.90,7.30
+"Carne, bovina, peito, sem gordura, cozido",Carnes e derivados,338.00,0.00,22.20,27.00
+"Carne, bovina, peito, sem gordura, cru",Carnes e derivados,259.00,0.00,17.60,20.40
+"Carne, bovina, picanha, com gordura, crua",Carnes e derivados,213.00,0.00,18.80,14.70
+"Carne, bovina, picanha, com gordura, grelhada",Carnes e derivados,289.00,0.00,26.40,19.50
+"Carne, bovina, picanha, sem gordura, crua",Carnes e derivados,134.00,0.00,21.30,4.70
+"Carne, bovina, picanha, sem gordura, grelhada",Carnes e derivados,238.00,0.00,31.90,11.30
+"Carne, bovina, seca, cozida",Carnes e derivados,313.00,0.00,26.90,21.90
+"Carne, bovina, seca, crua",Carnes e derivados,313.00,0.00,19.70,25.40
+"Coxinha de frango, frita",Carnes e derivados,283.00,34.50,9.60,11.80
+"Croquete, de carne, cru",Carnes e derivados,246.00,13.90,12.00,15.60
+"Croquete, de carne, frito",Carnes e derivados,347.00,18.10,16.90,22.70
+"Empada de frango, pré-cozida, assada",Carnes e derivados,358.00,47.50,6.90,15.60
+"Empada, de frango, pré-cozida",Carnes e derivados,377.00,35.50,7.30,22.90
+"Frango, asa, com pele, crua",Carnes e derivados,213.00,0.00,18.10,15.10
+"Frango, caipira, inteiro, com pele, cozido",Carnes e derivados,243.00,0.00,23.90,15.60
+"Frango, caipira, inteiro, sem pele, cozido",Carnes e derivados,196.00,0.00,29.60,7.70
+"Frango, coração, cru",Carnes e derivados,222.00,0.00,12.60,18.60
+"Frango, coração, grelhado",Carnes e derivados,207.00,0.60,22.40,12.10
+"Frango, coxa, com pele, assada",Carnes e derivados,215.00,0.10,28.50,10.40
+"Frango, coxa, com pele, crua",Carnes e derivados,161.00,0.00,17.10,9.80
+"Frango, coxa, sem pele, cozida",Carnes e derivados,167.00,0.00,26.90,5.80
+"Frango, coxa, sem pele, crua",Carnes e derivados,120.00,0.00,17.80,4.90
+"Frango, fígado, cru",Carnes e derivados,106.00,0.00,17.60,3.50
+"Frango, filé, à milanesa",Carnes e derivados,221.00,7.50,28.50,7.80
+"Frango, inteiro, com pele, cru",Carnes e derivados,226.00,0.00,16.40,17.30
+"Frango, inteiro, sem pele, assado",Carnes e derivados,187.00,0.00,28.00,7.50
+"Frango, inteiro, sem pele, cozido",Carnes e derivados,170.00,0.00,25.00,7.10
+"Frango, inteiro, sem pele, cru",Carnes e derivados,129.00,0.00,20.60,4.60
+"Frango, peito, com pele, assado",Carnes e derivados,212.00,0.00,33.40,7.60
+"Frango, peito, com pele, cru",Carnes e derivados,149.00,0.00,20.80,6.70
+"Frango, peito, sem pele, cozido",Carnes e derivados,163.00,0.00,31.50,3.20
+"Frango, peito, sem pele, cru",Carnes e derivados,119.00,0.00,21.50,3.00
+"Frango, peito, sem pele, grelhado",Carnes e derivados,159.00,0.00,32.00,2.50
+"Frango, sobrecoxa, com pele, assada",Carnes e derivados,260.00,0.00,28.70,15.20
+"Frango, sobrecoxa, com pele, crua",Carnes e derivados,255.00,0.00,15.50,20.90
+"Frango, sobrecoxa, sem pele, assada",Carnes e derivados,233.00,0.00,29.20,12.00
+"Frango, sobrecoxa, sem pele, crua",Carnes e derivados,162.00,0.00,17.60,9.60
+"Hambúrguer, bovino, cru",Carnes e derivados,215.00,4.20,13.20,16.20
+"Hambúrguer, bovino, frito",Carnes e derivados,258.00,6.30,20.00,17.00
+"Hambúrguer, bovino, grelhado",Carnes e derivados,210.00,11.30,13.20,12.40
+"Lingüiça, frango, crua",Carnes e derivados,218.00,0.00,14.20,17.40
+"Lingüiça, frango, frita",Carnes e derivados,245.00,0.00,18.30,18.50
+"Lingüiça, frango, grelhada",Carnes e derivados,244.00,0.00,18.20,18.40
+"Lingüiça, porco, crua",Carnes e derivados,227.00,0.00,16.10,17.60
+"Lingüiça, porco, frita",Carnes e derivados,280.00,0.00,20.50,21.30
+"Lingüiça, porco, grelhada",Carnes e derivados,296.00,0.00,23.20,21.90
+Mortadela,Carnes e derivados,269.00,5.80,12.00,21.60
+"Peru, congelado, assado",Carnes e derivados,163.00,0.00,26.20,5.70
+"Peru, congelado, cru",Carnes e derivados,94.00,0.00,18.10,1.80
+"Porco, bisteca, crua",Carnes e derivados,164.00,0.00,21.50,8.00
+"Porco, bisteca, frita",Carnes e derivados,311.00,0.00,33.70,18.50
+"Porco, bisteca, grelhada",Carnes e derivados,280.00,0.00,28.90,17.40
+"Porco, costela, assada",Carnes e derivados,402.00,0.00,30.20,30.30
+"Porco, costela, crua",Carnes e derivados,256.00,0.00,18.00,19.80
+"Porco, lombo, assado",Carnes e derivados,210.00,0.00,35.70,6.40
+"Porco, lombo, cru",Carnes e derivados,176.00,0.00,22.60,8.80
+"Porco, orelha, salgada, crua",Carnes e derivados,258.00,0.00,18.50,19.90
+"Porco, pernil, assado",Carnes e derivados,262.00,0.00,32.10,13.90
+"Porco, pernil, cru",Carnes e derivados,186.00,0.00,20.10,11.10
+"Porco, rabo, salgado, cru",Carnes e derivados,377.00,0.00,15.60,34.50
+"Presunto, com capa de gordura",Carnes e derivados,128.00,1.40,14.40,6.80
+"Presunto, sem capa de gordura",Carnes e derivados,94.00,2.10,14.30,2.70
+"Quibe, assado",Carnes e derivados,136.00,12.90,14.60,2.70
+"Quibe, cru",Carnes e derivados,109.00,10.80,12.40,1.70
+"Quibe, frito",Carnes e derivados,254.00,12.30,14.90,15.80
+Salame,Carnes e derivados,398.00,2.90,25.80,30.60
+"Toucinho, cru",Carnes e derivados,593.00,0.00,11.50,60.30
+"Toucinho, frito",Carnes e derivados,697.00,0.00,27.30,64.30
+"Bebida láctea, pêssego",Leite e derivados,55.00,7.60,2.10,1.90
+Creme de Leite,Leite e derivados,221.00,4.50,1.50,22.50
+"Iogurte, natural",Leite e derivados,51.00,1.90,4.10,3.00
+"Iogurte, natural, desnatado",Leite e derivados,41.00,5.80,3.80,0.30
+"Iogurte, sabor morango",Leite e derivados,70.00,9.70,2.70,2.30
+"Iogurte, sabor pêssego",Leite e derivados,68.00,9.40,2.50,2.30
+"Leite, condensado",Leite e derivados,313.00,57.00,7.70,6.70
+"Leite, de cabra",Leite e derivados,66.00,5.20,3.10,3.80
+"Leite, de vaca, achocolatado",Leite e derivados,83.00,14.20,2.10,2.20
+"Leite, de vaca, desnatado, pó",Leite e derivados,362.00,53.00,34.70,0.90
+"Leite, de vaca, integral, pó",Leite e derivados,497.00,39.20,25.40,26.90
+"Leite, fermentado",Leite e derivados,70.00,15.70,1.90,0.10
+"Queijo, minas, frescal",Leite e derivados,264.00,3.20,17.40,20.20
+"Queijo, minas, meia cura",Leite e derivados,321.00,3.60,21.20,24.60
+"Queijo, mozarela",Leite e derivados,330.00,3.00,22.60,25.20
+"Queijo, parmesão",Leite e derivados,453.00,1.70,35.60,33.50
+"Queijo, pasteurizado",Leite e derivados,303.00,5.70,9.40,27.40
+"Queijo, petit suisse, morango",Leite e derivados,121.00,18.50,5.80,2.80
+"Queijo, prato",Leite e derivados,360.00,1.90,22.70,29.10
+"Queijo, requeijão, cremoso",Leite e derivados,257.00,2.40,9.60,23.40
+"Queijo, ricota",Leite e derivados,140.00,3.80,12.60,8.10
+"Bebida isotônica, sabores variados",Bebidas (alcoólicas e não alcoólicas),26.00,6.40,0.00,0.00
+"Café, infusão 10%",Bebidas (alcoólicas e não alcoólicas),9.00,1.50,0.70,0.10
+"Cana, caldo de",Bebidas (alcoólicas e não alcoólicas),65.00,18.20,0.00,0.00
+"Cerveja, pilsen 2",Bebidas (alcoólicas e não alcoólicas),41.00,3.30,0.60,0.00
+"Chá, erva-doce, infusão 5%",Bebidas (alcoólicas e não alcoólicas),1.00,0.40,0.00,0.00
+"Chá, mate, infusão 5%",Bebidas (alcoólicas e não alcoólicas),3.00,0.60,0.00,0.10
+"Chá, preto, infusão 5%",Bebidas (alcoólicas e não alcoólicas),2.00,0.60,0.00,0.00
+"Coco, água de",Bebidas (alcoólicas e não alcoólicas),22.00,5.30,0.00,0.00
+"Refrigerante, tipo água tônica",Bebidas (alcoólicas e não alcoólicas),31.00,8.00,0.00,0.00
+"Refrigerante, tipo cola",Bebidas (alcoólicas e não alcoólicas),34.00,8.70,0.00,0.00
+"Refrigerante, tipo guaraná",Bebidas (alcoólicas e não alcoólicas),39.00,10.00,0.00,0.00
+"Refrigerante, tipo laranja",Bebidas (alcoólicas e não alcoólicas),46.00,11.80,0.00,0.00
+"Refrigerante, tipo limão",Bebidas (alcoólicas e não alcoólicas),40.00,10.30,0.00,0.00
+"Omelete, de queijo",Ovos e derivados,268.00,0.40,15.60,22.00
+"Ovo, de codorna, inteiro, cru",Ovos e derivados,177.00,0.80,13.70,12.70
+"Ovo, de galinha, clara, cozida/10minutos",Ovos e derivados,59.00,0.00,13.40,0.10
+"Ovo, de galinha, gema, cozida/10minutos",Ovos e derivados,353.00,1.60,15.90,30.80
+"Ovo, de galinha, inteiro, cozido/10minutos",Ovos e derivados,146.00,0.60,13.30,9.50
+"Ovo, de galinha, inteiro, cru",Ovos e derivados,143.00,1.60,13.00,8.90
+"Ovo, de galinha, inteiro, frito",Ovos e derivados,240.00,1.20,15.60,18.60
+"Achocolatado, pó",Produtos açucarados,401.00,91.20,4.20,2.20
+"Açúcar, cristal",Produtos açucarados,387.00,99.60,0.30,0.00
+"Açúcar, mascavo",Produtos açucarados,369.00,94.50,0.80,0.10
+"Açúcar, refinado",Produtos açucarados,387.00,99.50,0.30,0.00
+"Chocolate, ao leite",Produtos açucarados,540.00,59.60,7.20,30.30
+"Chocolate, ao leite, com castanha do Pará",Produtos açucarados,559.00,55.40,7.40,34.20
+"Chocolate, ao leite, dietético",Produtos açucarados,557.00,56.30,6.90,33.80
+"Chocolate, meio amargo",Produtos açucarados,475.00,62.40,4.90,29.90
+Cocada branca,Produtos açucarados,449.00,81.40,1.10,13.60
+"Doce, de abóbora, cremoso",Produtos açucarados,199.00,54.60,0.90,0.20
+"Doce, de leite, cremoso",Produtos açucarados,306.00,59.50,5.50,6.00
+"Geléia, mocotó, natural",Produtos açucarados,106.00,24.20,2.10,0.10
+Glicose de milho,Produtos açucarados,292.00,79.40,0.00,0.00
+Maria mole,Produtos açucarados,301.00,73.60,3.80,0.20
+"Maria mole, coco queimado",Produtos açucarados,307.00,75.10,3.90,0.10
+Marmelada,Produtos açucarados,257.00,70.80,0.40,0.10
+"Mel, de abelha",Produtos açucarados,309.00,84.00,0.00,0.00
+Melado,Produtos açucarados,297.00,76.60,0.00,0.00
+Quindim,Produtos açucarados,411.00,46.30,4.70,24.40
+Rapadura,Produtos açucarados,352.00,90.80,1.00,0.10
+"Café, pó, torrado",Miscelâneas,419.00,65.80,14.70,11.90
+"Capuccino, pó",Miscelâneas,417.00,73.60,11.30,8.60
+"Fermento em pó, químico",Miscelâneas,90.00,43.90,0.50,0.10
+"Fermento, biológico, levedura, tablete",Miscelâneas,90.00,7.70,17.00,1.50
+"Gelatina, sabores variados, pó",Miscelâneas,380.00,89.20,8.90,0.00
+Shoyu,Miscelâneas,61.00,11.60,3.30,0.30
+Tempero a base de sal,Miscelâneas,21.00,2.10,2.70,0.30
+"Azeitona, preta, conserva",Outros alimentos industrializados,194.00,5.50,1.20,20.30
+"Azeitona, verde, conserva",Outros alimentos industrializados,137.00,4.10,0.90,14.20
+"Chantilly, spray, com gordura vegetal",Outros alimentos industrializados,315.00,16.90,0.50,27.30
+"Leite, de coco",Outros alimentos industrializados,166.00,2.20,1.00,18.40
+"Maionese, tradicional com ovos",Outros alimentos industrializados,302.00,7.90,0.60,30.50
+Acarajé,Alimentos preparados,289.00,19.10,8.30,19.90
+Arroz carreteiro,Alimentos preparados,154.00,11.60,10.80,7.10
+"Baião de dois, arroz e feijão-de-corda",Alimentos preparados,136.00,20.40,6.20,3.20
+Barreado,Alimentos preparados,165.00,0.20,18.30,9.50
+"Bife à cavalo, com contra filé",Alimentos preparados,291.00,0.00,23.70,21.10
+Bolinho de arroz,Alimentos preparados,274.00,41.70,8.00,8.30
+Camarão à baiana,Alimentos preparados,101.00,3.20,7.90,6.00
+"Charuto, de repolho",Alimentos preparados,78.00,10.10,6.80,1.10
+"Cuscuz, de milho, cozido com sal",Alimentos preparados,113.00,25.30,2.20,0.70
+"Cuscuz, paulista",Alimentos preparados,142.00,22.50,2.60,4.60
+"Cuxá, molho",Alimentos preparados,80.00,5.70,5.60,3.60
+Dobradinha,Alimentos preparados,125.00,0.00,19.80,4.40
+Estrogonofe de carne,Alimentos preparados,173.00,3.00,15.00,10.80
+Estrogonofe de frango,Alimentos preparados,157.00,2.60,17.60,8.00
+Feijão tropeiro mineiro,Alimentos preparados,152.00,19.60,10.20,6.80
+Feijoada,Alimentos preparados,117.00,11.60,8.70,6.50
+"Frango, com açafrão",Alimentos preparados,113.00,4.10,9.70,6.20
+"Macarrão, molho bolognesa",Alimentos preparados,120.00,22.50,4.90,0.90
+Maniçoba,Alimentos preparados,134.00,3.40,10.00,8.70
+Quibebe,Alimentos preparados,86.00,6.60,8.60,2.70
+"Salada, de legumes, com maionese",Alimentos preparados,96.00,8.90,1.10,7.00
+"Salada, de legumes, cozida no vapor",Alimentos preparados,35.00,7.10,2.00,0.30
+"Salpicão, de frango",Alimentos preparados,148.00,4.60,13.90,7.80
+Sarapatel,Alimentos preparados,123.00,1.10,18.50,4.40
+Tabule,Alimentos preparados,57.00,10.60,2.00,1.20
+Tacacá,Alimentos preparados,47.00,3.40,7.00,0.40
+"Tapioca, com manteiga",Alimentos preparados,348.00,63.60,0.10,10.90
+"Tucupi, com pimenta-de-cheiro",Alimentos preparados,27.00,4.70,2.10,0.30
+Vaca atolada,Alimentos preparados,145.00,10.10,5.10,9.30
+Vatapá,Alimentos preparados,255.00,9.70,6.00,23.20
+Virado à paulista,Alimentos preparados,307.00,14.10,10.20,25.60
+Yakisoba,Alimentos preparados,113.00,18.30,7.50,2.60
+"Amendoim, grão, cru",Leguminosas e derivados,544.00,20.30,27.20,43.90
+"Amendoim, torrado, salgado",Leguminosas e derivados,606.00,18.70,22.50,54.00
+"Ervilha, em vagem",Leguminosas e derivados,88.00,14.20,7.50,0.50
+"Ervilha, enlatada, drenada",Leguminosas e derivados,74.00,13.40,4.60,0.40
+"Feijão, carioca, cozido",Leguminosas e derivados,76.00,13.60,4.80,0.50
+"Feijão, carioca, cru",Leguminosas e derivados,329.00,61.20,20.00,1.30
+"Feijão, fradinho, cozido",Leguminosas e derivados,78.00,13.50,5.10,0.60
+"Feijão, fradinho, cru",Leguminosas e derivados,339.00,61.20,20.20,2.40
+"Feijão, jalo, cozido",Leguminosas e derivados,93.00,16.50,6.10,0.50
+"Feijão, jalo, cru",Leguminosas e derivados,328.00,61.50,20.10,0.90
+"Feijão, preto, cozido",Leguminosas e derivados,77.00,14.00,4.50,0.50
+"Feijão, preto, cru",Leguminosas e derivados,324.00,58.80,21.30,1.20
+"Feijão, rajado, cozido",Leguminosas e derivados,85.00,15.30,5.50,0.40
+"Feijão, rajado, cru",Leguminosas e derivados,326.00,62.90,17.30,1.20
+"Feijão, rosinha, cozido",Leguminosas e derivados,68.00,11.80,4.50,0.50
+"Feijão, rosinha, cru",Leguminosas e derivados,337.00,62.20,20.90,1.30
+"Feijão, roxo, cozido",Leguminosas e derivados,77.00,12.90,5.70,0.50
+"Feijão, roxo, cru",Leguminosas e derivados,331.00,60.00,22.20,1.20
+"Grão-de-bico, cru",Leguminosas e derivados,355.00,57.90,21.20,5.40
+"Guandu, cru",Leguminosas e derivados,344.00,64.00,19.00,2.10
+"Lentilha, cozida",Leguminosas e derivados,93.00,16.30,6.30,0.50
+"Lentilha, crua",Leguminosas e derivados,339.00,62.00,23.20,0.80
+"Paçoca, amendoim",Leguminosas e derivados,487.00,52.40,16.00,26.10
+"Pé-de-moleque, amendoim",Leguminosas e derivados,503.00,54.70,13.20,28.00
+"Soja, farinha",Leguminosas e derivados,404.00,38.40,36.00,14.60
+"Soja, extrato solúvel, natural, fluido",Leguminosas e derivados,39.00,4.30,2.40,1.60
+"Soja, extrato solúvel, pó",Leguminosas e derivados,459.00,28.50,35.70,26.20
+"Soja, queijo (tofu)",Leguminosas e derivados,64.00,2.10,6.60,4.00
+"Tremoço, cru",Leguminosas e derivados,381.00,43.80,33.60,10.30
+"Tremoço, em conserva",Leguminosas e derivados,121.00,12.40,11.10,3.80
+"Amêndoa, torrada, salgada",Nozes e sementes,581.00,29.50,18.60,47.30
+"Castanha-de-caju, torrada, salgada",Nozes e sementes,570.00,29.10,18.50,46.30
+"Castanha-do-Brasil, crua",Nozes e sementes,643.00,15.10,14.50,63.50
+"Coco, cru",Nozes e sementes,406.00,10.40,3.70,42.00
+"Farinha, de mesocarpo de babaçu, crua",Nozes e sementes,329.00,79.20,1.40,0.20
+"Gergelim, semente",Nozes e sementes,584.00,21.60,21.20,50.40
+"Linhaça, semente",Nozes e sementes,495.00,43.30,14.10,32.30
+"Pinhão, cozido",Nozes e sementes,174.00,43.90,3.00,0.70
+"Pupunha, cozida",Nozes e sementes,219.00,29.60,2.50,12.80
+"Noz, crua",Nozes e sementes,620.00,18.40,14.00,59.40
